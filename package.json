@@ -1,0 +1,14 @@
+{
+  "name": "cellpilot-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The CellPilot Device API: specification, schemas, guide and conformance tools for building a CellPilot backend.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "mock": "node tools/mock-backend.mjs --port 8799 --code 123456",
+    "check": "node tools/api-check.mjs",
+    "relay": "node tools/test-relay.mjs --port 18780"
+  }
+}

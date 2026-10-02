@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BotchanGit/cellpilot-api/main/spec/events.schema.json",
+  "title": "CellPilot Device API v1: event stream frames",
+  "description": "Every JSON text frame on GET /v1/events (device-api.md, *Event stream*). The server's first frame is always `hello`; `ack` is the only JSON frame a client sends. Object shapes refer to openapi.json (generated from openapi.yaml). A client ignores a `type` it does not know, and fields it does not know. Binary frames carry call audio and are not JSON: 1 byte direction (0x01 downlink backend → client, 0x02 uplink client → backend), 2 bytes sequence number (16-bit big-endian, wrapping, one counter per direction), then 320 bytes of PCM (16-bit signed little-endian, 8 kHz, mono, 20 ms) — 323 bytes in all; see device-api.md, *Audio frames*.",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/status" },
+    { "$ref": "#/$defs/call" },
+    { "$ref": "#/$defs/audio" },
+    { "$ref": "#/$defs/message" },
+    { "$ref": "#/$defs/conversations" },
+    { "$ref": "#/$defs/contacts" },
+    { "$ref": "#/$defs/calls" },
+    { "$ref": "#/$defs/voicemail" },
+    { "$ref": "#/$defs/voicemails" },
+    { "$ref": "#/$defs/security" },
+    { "$ref": "#/$defs/client" },
+    { "$ref": "#/$defs/features" },
+    { "$ref": "#/$defs/log" },
+    { "$ref": "#/$defs/rev" },
+    { "$ref": "#/$defs/badge" },
+    { "$ref": "#/$defs/notify" },
+    { "$ref": "#/$defs/ack" }
+  ],
+  "$defs": {
+    "rev": {
+      "description": "Something clients keep changed that no other event carries (settings, the push problem): fetch GET /v1/snapshot. Only with the snapshot feature.",
+      "type": "object",
+      "required": ["type", "rev"],
+      "properties": { "type": { "const": "rev" }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "revValue": {
+      "description": "The state version: this run of the backend, a dot, a counter. Present on an event only with the snapshot feature, and only on events that carry a change clients keep (device-api.md, *Event stream*).",
+      "type": "string",
+      "pattern": "^[^.]+\\.[0-9]+$"
+    },
+    "hello": {
+      "description": "Always the first frame on a socket.",
+      "type": "object",
+      "required": ["type", "backend", "features", "status"],
+      "properties": {
+        "type": { "const": "hello" },
+        "backend": { "$ref": "openapi.json#/components/schemas/Backend" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "status": { "$ref": "openapi.json#/components/schemas/Status" },
+        "badge": { "type": "integer", "minimum": 0, "description": "Optional: the icon badge." },
+        "rev": { "$ref": "#/$defs/revValue" },
+        "alerts": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/SecurityAlert" }, "description": "Optional, with security: the unacknowledged alerts." }
+      }
+    },
+    "status": {
+      "description": "The device's state changed. Carries the device alone; call, holder and audio have their own events.",
+      "type": "object",
+      "required": ["type", "device"],
+      "properties": {
+        "type": { "const": "status" },
+        "device": { "oneOf": [{ "$ref": "openapi.json#/components/schemas/Device" }, { "type": "null" }] }
+      }
+    },
+    "call": {
+      "description": "The call or its holder changed; sent at every transition, including to null.",
+      "type": "object",
+      "required": ["type", "call", "holder"],
+      "properties": {
+        "type": { "const": "call" },
+        "call": { "oneOf": [{ "$ref": "openapi.json#/components/schemas/Call" }, { "type": "null" }] },
+        "holder": { "oneOf": [{ "$ref": "openapi.json#/components/schemas/Holder" }, { "type": "null" }] }
+      }
+    },
+    "audio": {
+      "description": "The backend started (true) or stopped exchanging audio frames with the holder.",
+      "type": "object",
+      "required": ["type", "active"],
+      "properties": { "type": { "const": "audio" }, "active": { "type": "boolean" } }
+    },
+    "message": {
+      "description": "A message arrived (once per part of a long one, the same id, `parts` counting), an outgoing one was recorded (pending), or its status changed.",
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": { "type": { "const": "message" }, "message": { "$ref": "openapi.json#/components/schemas/Message" }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "conversations": {
+      "description": "The conversation list (and, with trash, the trash) changed: the whole lists.",
+      "type": "object",
+      "required": ["type", "conversations"],
+      "properties": {
+        "type": { "const": "conversations" },
+        "conversations": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Conversation" } },
+        "trash": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Conversation" } },
+        "rev": { "$ref": "#/$defs/revValue" }
+      }
+    },
+    "contacts": {
+      "type": "object",
+      "required": ["type", "contacts"],
+      "properties": { "type": { "const": "contacts" }, "contacts": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Contact" } }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "calls": {
+      "description": "The history changed: its newest page (the reference backend sends 50).",
+      "type": "object",
+      "required": ["type", "calls"],
+      "properties": { "type": { "const": "calls" }, "calls": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/CallRecord" } }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "voicemail": {
+      "description": "The answering machine is recording (recording: true; transcript the whole text so far, delta the new part) or has finished (recording: false, the final transcript; \"\" without transcription). Moves no rev.",
+      "type": "object",
+      "required": ["type", "peer", "reason", "recording", "transcript"],
+      "properties": {
+        "type": { "const": "voicemail" },
+        "peer": { "type": "string" },
+        "reason": { "enum": ["no-answer", "declined"] },
+        "recording": { "type": "boolean" },
+        "transcript": { "type": "string" },
+        "delta": { "type": "string" }
+      }
+    },
+    "voicemails": {
+      "type": "object",
+      "required": ["type", "voicemails"],
+      "properties": { "type": { "const": "voicemails" }, "voicemails": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Voicemail" } }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "security": {
+      "description": "What the checks found changed, or an alert was raised (alert) or acknowledged. alerts are the unacknowledged ones.",
+      "type": "object",
+      "required": ["type", "state", "alerts"],
+      "properties": {
+        "type": { "const": "security" },
+        "state": { "$ref": "openapi.json#/components/schemas/SecurityState" },
+        "alerts": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/SecurityAlert" } },
+        "alert": { "$ref": "openapi.json#/components/schemas/SecurityAlert" },
+        "rev": { "$ref": "#/$defs/revValue" }
+      }
+    },
+    "client": {
+      "description": "This client's record or the endpoint list changed. Only to that client's sockets; moves no rev.",
+      "type": "object",
+      "required": ["type", "client", "endpoints"],
+      "properties": {
+        "type": { "const": "client" },
+        "client": { "$ref": "openapi.json#/components/schemas/Client" },
+        "endpoints": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Endpoint" } }
+      }
+    },
+    "features": {
+      "type": "object",
+      "required": ["type", "features"],
+      "properties": { "type": { "const": "features" }, "features": { "type": "array", "items": { "type": "string" } }, "rev": { "$ref": "#/$defs/revValue" } }
+    },
+    "log": {
+      "type": "object",
+      "required": ["type", "event"],
+      "properties": { "type": { "const": "log" }, "event": { "$ref": "openapi.json#/components/schemas/LogEvent" } }
+    },
+    "badge": {
+      "description": "Optional. The icon badge changed.",
+      "type": "object",
+      "required": ["type", "badge"],
+      "properties": { "type": { "const": "badge" }, "badge": { "type": "integer", "minimum": 0 } }
+    },
+    "notify": {
+      "description": "With notify: something that may call for a notification, to one client's sockets. It answers with ack within 5 s (1.5 s for call and call-end) or is pushed to.",
+      "type": "object",
+      "required": ["type", "id", "kind"],
+      "properties": {
+        "type": { "const": "notify" },
+        "id": { "type": "string", "pattern": "^(sms|call|alert|voicemail)-[0-9]+$", "description": "The same as the push's collapse id." },
+        "kind": { "enum": ["call", "call-end", "missed", "voicemail", "sms", "alert"] },
+        "callId": { "type": "integer", "description": "With call and call-end." },
+        "reason": { "enum": ["answered", "declined", "unanswered"], "description": "With call-end." }
+      }
+    },
+    "ack": {
+      "description": "Client to backend: the answer to a notify, once per id and kind, on the socket it came in on.",
+      "type": "object",
+      "required": ["type", "id", "kind", "state"],
+      "properties": {
+        "type": { "const": "ack" },
+        "id": { "type": "string" },
+        "kind": { "enum": ["call", "call-end", "missed", "voicemail", "sms", "alert"] },
+        "state": { "enum": ["foreground", "background"] }
+      }
+    }
+  }
+}

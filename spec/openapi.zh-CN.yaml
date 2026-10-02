@@ -1,0 +1,1259 @@
+openapi: 3.1.0
+info:
+  title: CellPilot 设备 API
+  version: "1"
+  license: { name: MIT }
+  description: |
+    CellPilot App 与控制蜂窝设备的后端之间的契约。旁边的 device-api.md（中文版 device-api.zh-CN.md）是规范，
+    不一致时以它为准；它讲 OpenAPI 描述不了的部分：事件流、音频帧、配对、推送和中转，events.schema.json 定义每个事件帧。标有 `x-feature` 的路由只在后端于 `GET /v1` 中声明了
+    该特性时才存在。标有 `x-optional` 的是后端可以不实现（返回 404）的核心路由，App 没有它们也能用。
+servers:
+  - url: "{endpoint}/v1"
+    variables:
+      endpoint:
+        default: http://192.168.1.10:9400
+        description: "GET /v1/client 返回的任意端点。"
+
+security:
+  - bearer: []
+
+tags:
+  - name: discovery
+  - name: client
+  - name: status
+  - name: call
+  - name: calls
+  - name: messages
+  - name: contacts
+  - name: voicemail
+  - name: settings
+  - name: security
+  - name: log
+
+paths:
+  /:
+    get:
+      operationId: getDiscovery
+      tags: [discovery]
+      summary: "这个后端是什么、支持哪些特性"
+      security: []
+      responses:
+        "200":
+          description: "后端描述"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Discovery" }
+
+  /ping:
+    get:
+      operationId: ping
+      tags: [discovery]
+      summary: "可达性与延迟；不做任何事"
+      security: []
+      responses:
+        "200":
+          description: "存活"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { ok: { type: boolean, const: true } }
+                required: [ok]
+
+  /pair:
+    post:
+      operationId: pair
+      tags: [client]
+      summary: "用后端发出的配对码或 token 换取客户端 token"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, description: "后端发给用户的凭证：六位配对码（参考后端就是这样发的），或后端自己的 token。" }
+                name: { type: string, maxLength: 60, description: "手机的名字。" }
+                platform: { type: string, maxLength: 20, default: ios }
+                lang: { $ref: "#/components/schemas/LangTag" }
+                uid: { type: string, description: "安装标识（identifierForVendor）。同一 uid 再次配对会替换之前的客户端记录。" }
+      responses:
+        "200":
+          description: "已配对"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, client, endpoints]
+                properties:
+                  token: { type: string, description: "Bearer token，只给这一次。" }
+                  client: { $ref: "#/components/schemas/Client" }
+                  endpoints: { type: array, items: { $ref: "#/components/schemas/Endpoint" } }
+        "400":
+          description: "请求不对：code 缺失或不是字符串，或请求体不是 JSON 对象。"
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /client:
+    get:
+      operationId: getClient
+      tags: [client]
+      summary: "本客户端及其可用的端点"
+      responses:
+        "200":
+          description: "客户端与端点"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientConfig" }
+    patch:
+      operationId: updateClient
+      tags: [client]
+      summary: "更新本客户端的名字、语言或安装标识"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                lang: { $ref: "#/components/schemas/LangTag" }
+                uid: { type: string }
+      responses:
+        "200":
+          description: "已更新"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientConfig" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: unpair
+      tags: [client]
+      summary: "解除本客户端的配对"
+      description: "后端忘掉这个 token 和所有推送 token；之后再拿它来请求一律返回 410。"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+
+  /client/push-tokens:
+    post:
+      operationId: registerPushToken
+      tags: [client]
+      summary: "为本客户端登记一个 APNs token"
+      x-feature: push
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, kind, environment]
+              properties:
+                token: { type: string, description: "十六进制的 APNs 设备 token。" }
+                kind: { type: string, enum: [alert, voip] }
+                environment: { type: string, enum: [sandbox, production], description: "这个 token 由哪个 APNs 环境签发。" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /client/push-tokens/{token}:
+    delete:
+      operationId: unregisterPushToken
+      tags: [client]
+      summary: "撤回这个客户端的一个推送 token"
+      description: "用户关掉系统来电界面时，App 用它撤回自己的 VoIP token。不认识的 token 也回 200。"
+      x-feature: push
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+
+  /push:
+    get:
+      operationId: getPushState
+      tags: [client]
+      summary: "后端怎么发送推送"
+      x-feature: push
+      responses:
+        "200":
+          description: "推送状态"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PushState" }
+  /push/enrol:
+    post:
+      operationId: enrolPush
+      tags: [client]
+      summary: "用本手机账号签发的许可，把后端登记到推送中转"
+      x-feature: push
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [relayUrl, grant]
+              properties:
+                relayUrl: { type: string, format: uri }
+                grant: { type: string, description: "中转发给本手机会话的一次性许可。" }
+      responses:
+        "200":
+          description: "登记之后的推送状态"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PushState" }
+        "502": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /portal/session:
+    post:
+      operationId: createPortalSession
+      tags: [client]
+      summary: "进入后端网页界面的短期入口"
+      x-feature: portal
+      responses:
+        "200":
+          description: "要打开的地址"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expiresInS]
+                properties:
+                  url: { type: string, format: uri }
+                  expiresInS: { type: integer }
+                  cookies:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, value]
+                      properties:
+                        name: { type: string }
+                        value: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /status:
+    get:
+      operationId: getStatus
+      tags: [status]
+      summary: "后端、设备、通话和音频状态"
+      responses:
+        "200":
+          description: "状态"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+
+  /events:
+    get:
+      operationId: openEventStream
+      tags: [status]
+      summary: "事件流（WebSocket 升级）"
+      description: "见规范“事件流”。先发 `hello`，之后事件以 JSON 文本帧发送；音频以二进制帧发送。"
+      parameters:
+        - { name: lang, in: query, schema: { $ref: "#/components/schemas/LangTag" } }
+      responses:
+        "101": { description: "切换协议" }
+
+  /call:
+    get:
+      operationId: getCall
+      tags: [call]
+      summary: "当前通话"
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+  /call/dial:
+    post:
+      operationId: dial
+      tags: [call]
+      summary: "拨打电话"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number]
+              properties: { number: { type: string, description: "按输入的样子。先去掉分隔符（空格、横线、点、括号），之后是 1–32 个 0-9 * #，可带前导 +。按输入的样子拨出。" } }
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+  /call/answer:
+    post:
+      operationId: answer
+      tags: [call]
+      summary: "接听正在响铃的来电"
+      description: "有 `screening` 特性时，也可以接管后端正在录音的通话。"
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "409": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+  /call/hangup:
+    post:
+      operationId: hangup
+      tags: [call]
+      summary: "挂断或拒接"
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "400": { $ref: "#/components/responses/Error" }
+  /call/dtmf:
+    post:
+      operationId: sendDtmf
+      tags: [call]
+      summary: "在通话中发送 DTMF 按键"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [digits]
+              properties: { digits: { type: string, pattern: "^[0-9*#]{1,32}$" } }
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "409": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /call/screen:
+    post:
+      operationId: screenCall
+      tags: [call]
+      summary: "把响铃中的来电交给后端的答录机"
+      x-feature: screening
+      description: "后端没有答录机可交时，等同于挂断。"
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "400": { $ref: "#/components/responses/Error" }
+  /call/claim:
+    post:
+      operationId: claimCall
+      tags: [call]
+      summary: "接管后端正持有的通话"
+      x-feature: screening
+      responses:
+        "200": { $ref: "#/components/responses/CallState" }
+        "409": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /calls:
+    get:
+      operationId: listCalls
+      tags: [calls]
+      summary: "通话记录，最新在前"
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: "记录"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [calls]
+                properties:
+                  calls: { type: array, items: { $ref: "#/components/schemas/CallRecord" } }
+  /snapshot:
+    get:
+      operationId: getSnapshot
+      x-feature: snapshot
+      tags: [status]
+      summary: "客户端保存的一切，同一个状态版本"
+      responses:
+        "200":
+          description: "rev, status, features, conversations, trash, calls, contacts, voicemails, settings, security, client, push, badge"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Snapshot" }
+  /calls/{id}:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    delete:
+      operationId: deleteCall
+      tags: [calls]
+      summary: "删除一条记录"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /calls/{id}/seen:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    post:
+      operationId: markCallSeen
+      x-optional: true
+      tags: [calls]
+      summary: "把未接来电标为已看，所有客户端生效"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: "会话列表，按最后一条短信的 id 新的在前"
+      responses:
+        "200":
+          description: "会话"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+  /conversations/{peer}:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    delete:
+      operationId: deleteConversation
+      tags: [messages]
+      summary: "删除会话（有 `trash` 特性时进回收站）"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+  /conversations/{peer}/messages:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: "与某个号码的短信，最新在前"
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Messages" }
+  /conversations/{peer}/read:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    post:
+      operationId: markConversationRead
+      tags: [messages]
+      summary: "把会话标为已读"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /messages:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: "发送短信"
+      description: "返回记下的这条短信：`pending`，或者——后端等模块发完再回时（参考后端就是这样）——已是 `sent` 或 `failed`。App 两种都接受。之后发 `message` 事件（pending，再 sent/failed），然后 `conversations`。"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, text]
+              properties:
+                to: { type: string, description: "按输入的样子。先去掉分隔符，之后是 3–20 位数字，可带前导 +。" }
+                text: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: "已排队"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties: { message: { $ref: "#/components/schemas/Message" } }
+        "503": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /messages/search:
+    get:
+      operationId: searchMessages
+      tags: [messages]
+      summary: "搜索短信正文"
+      x-feature: search
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Messages" }
+  /messages/{id}:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    delete:
+      operationId: deleteMessage
+      tags: [messages]
+      summary: "永久删除一条短信"
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /messages/{id}/trash:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    post:
+      operationId: trashMessage
+      tags: [messages]
+      summary: "把一条短信移入回收站"
+      x-feature: trash
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /trash:
+    get:
+      operationId: listTrash
+      tags: [messages]
+      summary: "回收站里的会话"
+      x-feature: trash
+      responses:
+        "200":
+          description: "回收站中的会话"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+  /trash/restore:
+    post:
+      operationId: restoreConversations
+      tags: [messages]
+      summary: "从回收站恢复会话"
+      x-feature: trash
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /trash/purge:
+    post:
+      operationId: purgeConversations
+      tags: [messages]
+      summary: "永久删除回收站里的会话"
+      x-feature: trash
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: "联系人：姓名和号码"
+      x-feature: contacts
+      responses:
+        "200":
+          description: "联系人"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contacts]
+                properties:
+                  contacts: { type: array, items: { $ref: "#/components/schemas/Contact" } }
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: "新建联系人"
+      x-feature: contacts
+      requestBody: { $ref: "#/components/requestBodies/ContactInput" }
+      responses:
+        "200":
+          description: "已创建"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contact]
+                properties: { contact: { $ref: "#/components/schemas/Contact" } }
+        "400": { $ref: "#/components/responses/Error" }
+  /contacts/{id}:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    put:
+      operationId: replaceContact
+      tags: [contacts]
+      summary: "整体替换联系人的姓名和号码"
+      x-feature: contacts
+      requestBody: { $ref: "#/components/requestBodies/ContactInput" }
+      responses:
+        "200":
+          description: "联系人"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [contact]
+                properties: { contact: { $ref: "#/components/schemas/Contact" } }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      summary: "删除联系人"
+      x-feature: contacts
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /voicemails:
+    get:
+      operationId: listVoicemails
+      tags: [voicemail]
+      summary: "留言录音，最新在前"
+      x-feature: voicemail
+      parameters:
+        - { name: peer, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: "录音"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [voicemails]
+                properties:
+                  voicemails: { type: array, items: { $ref: "#/components/schemas/Voicemail" } }
+  /voicemails/{id}:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    delete:
+      operationId: deleteVoicemail
+      tags: [voicemail]
+      summary: "删除一条录音"
+      x-feature: voicemail
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /voicemails/{id}/audio:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    get:
+      operationId: getVoicemailAudio
+      tags: [voicemail]
+      summary: "录音文件本身"
+      x-feature: voicemail
+      description: "获取即视为已听。"
+      responses:
+        "200":
+          description: "WAV 音频"
+          content:
+            audio/wav:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /voicemails/{id}/transcribe:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    post:
+      operationId: transcribeVoicemail
+      tags: [voicemail]
+      summary: "转写一条录音"
+      x-feature: transcription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language: { $ref: "#/components/schemas/TranscriptionLanguage" }
+      responses:
+        "200":
+          description: "转写文本"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transcript, language]
+                properties:
+                  transcript: { type: string }
+                  language: { type: string, description: "请求的语言（没带为 auto）；同时存为留言的 transcriptLanguage。" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: "用户可以改的后端设置"
+      x-feature: settings
+      responses:
+        "200":
+          description: "设置"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: "修改设置"
+      x-feature: settings
+      description: "只发要改的部分。各分节归属于特性（`voicemail`、`transcription`），没有该特性的后端不返回对应分节。"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SettingsPatch" }
+      responses:
+        "200":
+          description: "修改后的设置"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /security:
+    get:
+      operationId: getSecurity
+      tags: [security]
+      summary: "安全检查与告警"
+      x-feature: security
+      parameters:
+        - { name: all, in: query, schema: { type: boolean, default: false }, description: "包含已确认的告警。" }
+      responses:
+        "200":
+          description: "状态与告警"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state, alerts]
+                properties:
+                  state: { $ref: "#/components/schemas/SecurityState" }
+                  alerts: { type: array, items: { $ref: "#/components/schemas/SecurityAlert" } }
+  /security/alerts/{id}/ack:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    post:
+      operationId: acknowledgeAlert
+      tags: [security]
+      summary: "确认一条告警"
+      x-feature: security
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "404": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /security/alerts/ack:
+    post:
+      operationId: acknowledgeAllAlerts
+      tags: [security]
+      summary: "确认全部告警"
+      x-feature: security
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /log:
+    get:
+      operationId: listLog
+      tags: [log]
+      summary: "后端事件日志，最新在前"
+      x-feature: log
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: "日志条目"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events: { type: array, items: { $ref: "#/components/schemas/LogEvent" } }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: "客户端 token。"
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    peer:
+      name: peer
+      in: path
+      required: true
+      schema: { type: string }
+      description: "号码，需百分号编码。"
+    beforeId:
+      name: beforeId
+      in: query
+      schema: { type: integer }
+      description: "只返回 id 小于此值的条目。不是数字时忽略。"
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 100, minimum: 1, maximum: 500 }
+      description: 超出范围时夹到 1–500，不报错；不是数字时忽略。路由可以有自己的默认值和上限（搜索 50/200、日志 200/1000）。
+
+  requestBodies:
+    ContactInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              firstName: { type: string, maxLength: 80 }
+              lastName: { type: string, maxLength: 80 }
+              numbers:
+                type: array
+                maxItems: 20
+                items: { type: string }
+                description: "最多 20 个。每个按保存形式存（去掉分隔符）、截到 32 个字符；一个数字都没有的丢掉，不因格式拒绝任何号码。同一个号码字符串给了这个联系人，就从其它联系人处拿走。"
+    Peers:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [peers]
+            properties:
+              peers: { type: array, items: { type: string }, minItems: 1, maxItems: 500 }
+
+  responses:
+    Empty:
+      description: "完成"
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: false }
+    Error:
+      description: "错误"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    CallState:
+      description: "动作之后的通话状态"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/CallState" }
+    Messages:
+      description: "短信"
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [messages]
+            properties:
+              messages: { type: array, items: { $ref: "#/components/schemas/Message" } }
+
+  schemas:
+    Lang:
+      type: string
+      enum: [en, zh]
+
+    LangTag:
+      type: string
+      description: "任何语言标签。以 zh 开头的（zh、zh-Hans）表示中文，其他一律英文。"
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, device_unavailable, internal, upstream_failed]
+              description: "upstream_failed（502）只来自 POST /v1/push/enrol：中转拒绝或没有回答。"
+            message: { type: string, description: "给人看的文字，使用读者的语言。" }
+            details:
+              type: object
+              additionalProperties: true
+              properties:
+                field: { type: string, description: '出错的字段；嵌套字段用点连接（"voicemail.answerAfterS"）。' }
+
+    Discovery:
+      type: object
+      required: [api, version, backend, features]
+      properties:
+        api: { type: string, const: cellpilot-device-api }
+        version: { type: integer, const: 1 }
+        backend: { $ref: "#/components/schemas/Backend" }
+        features:
+          type: array
+          description: "后端现在具备的特性。已知的有：push、portal、contacts、search、trash、voicemail、transcription、settings、security、log、places、screening、snapshot、notify；客户端忽略其他值。"
+          items:
+            type: string
+
+    Backend:
+      type: object
+      required: [name, version]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        uptimeS: { type: integer }
+
+    Client:
+      type: object
+      required: [id, name, lang]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        lang: { $ref: "#/components/schemas/Lang" }
+
+    Endpoint:
+      type: object
+      required: [id, label, url, priority]
+      properties:
+        id: { type: string }
+        label: { type: string, description: "展示给用户的名字。" }
+        url: { type: string, format: uri, description: "基础地址，不含 /v1。" }
+        priority: { type: integer, description: "数值越小越优先。" }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+          description: "经此端点的每个请求和事件流连接都带上这些头。"
+        tokenHeader: { type: string, enum: [X-CellPilot-Token], description: '这条路上的代理自己要用 Authorization 时填 "X-CellPilot-Token"；客户端把 token 放在这里，不动 Authorization。不填：Authorization: Bearer。' }
+        tlsPin: { type: string, description: '服务端证书（DER）的 SHA-256，base64。客户端对这个端点只信任这张证书：用于自签名证书。' }
+        clientCertificate:
+          type: object
+          required: [p12, password]
+          description: '服务端要求的客户端证书（双向 TLS）：PKCS#12 证书包（base64）和密码。'
+          properties:
+            p12: { type: string, contentEncoding: base64 }
+            password: { type: string }
+        vpn: { type: string, description: '手机要连着哪个 VPN 才能到这个端点（"Tailscale"），端点连不上时 App 会提示。' }
+
+    ClientConfig:
+      type: object
+      required: [client, endpoints]
+      properties:
+        client: { $ref: "#/components/schemas/Client" }
+        endpoints: { type: array, items: { $ref: "#/components/schemas/Endpoint" } }
+        pushTokens:
+          type: array
+          description: "有 push 时：后端为这个客户端持有的推送 token。"
+          items:
+            type: object
+            required: [token, kind]
+            properties: { token: { type: string }, kind: { type: string, enum: [alert, voip] } }
+
+    PushState:
+      type: object
+      required: [mode, relay]
+      properties:
+        mode: { type: string, enum: [none, relay, direct], description: "none：还没有推送途径；relay：已在中转登记。direct：保留值；后端报告 none 或 relay。" }
+        relay:
+          oneOf:
+            - type: object
+              required: [url, daemonId]
+              properties:
+                url: { type: string, format: uri }
+                daemonId: { type: string }
+            - type: "null"
+        problem:
+          description: "可选。推送为什么发不出去；恢复后为 null 或不出现。"
+          oneOf:
+            - type: object
+              required: [code, at]
+              properties:
+                code: { type: string, enum: [suspended, not-entitled, quota, rate, not-enrolled, unbound, apns, unreachable] }
+                at: { type: string, format: date-time }
+                quota: { type: integer }
+            - type: "null"
+
+    Snapshot:
+      type: object
+      description: "客户端保存的一切，同一个 rev。"
+      required: [rev, status, features, conversations, trash, calls, voicemails, client, badge, contacts, settings, security, push]
+      properties:
+        rev: { type: string }
+        status: { $ref: "#/components/schemas/Status" }
+        features: { type: array, items: { type: string } }
+        conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+        trash: { type: array, items: { $ref: "#/components/schemas/Conversation" }, description: "回收站；没有 trash 特性时为 []。" }
+        calls: { type: array, items: { $ref: "#/components/schemas/CallRecord" }, description: "通话记录最新一页（100 条）。" }
+        voicemails: { type: array, items: { $ref: "#/components/schemas/Voicemail" }, description: "没有 voicemail 特性时为 []。" }
+        client:
+          allOf: [{ $ref: "#/components/schemas/ClientConfig" }]
+          description: "这个客户端，含 pushTokens。"
+        badge: { type: integer, description: "图标角标。" }
+        contacts:
+          oneOf: [{ type: array, items: { $ref: "#/components/schemas/Contact" } }, { type: "null" }]
+          description: "没有 contacts 特性时为 null。"
+        settings:
+          oneOf: [{ $ref: "#/components/schemas/Settings" }, { type: "null" }]
+          description: "没有 settings 特性时为 null。"
+        security:
+          oneOf:
+            - type: object
+              required: [state, alerts]
+              properties:
+                state: { $ref: "#/components/schemas/SecurityState" }
+                alerts: { type: array, items: { $ref: "#/components/schemas/SecurityAlert" }, description: "未确认的告警。" }
+            - type: "null"
+          description: "没有 security 特性时为 null。"
+        push:
+          oneOf: [{ $ref: "#/components/schemas/PushState" }, { type: "null" }]
+          description: "没有 push 特性时为 null。"
+
+    Status:
+      type: object
+      required: [backend, device, call, holder, audio]
+      properties:
+        backend: { $ref: "#/components/schemas/Backend" }
+        device:
+          oneOf: [{ $ref: "#/components/schemas/Device" }, { type: "null" }]
+        call:
+          oneOf: [{ $ref: "#/components/schemas/Call" }, { type: "null" }]
+        holder:
+          oneOf: [{ $ref: "#/components/schemas/Holder" }, { type: "null" }]
+        audio:
+          type: object
+          required: [ready, active]
+          properties:
+            ready: { type: boolean, description: "后端能够传送通话音频。" }
+            active: { type: boolean, description: "音频正在传送。" }
+        security:
+          $ref: "#/components/schemas/SecurityState"
+          description: "仅在有 `security` 特性时出现。"
+
+    Device:
+      type: object
+      required: [connected, sim, signal, registration, operator, rat, volte, home, location, updatedAt]
+      properties:
+        connected: { type: boolean }
+        identity:
+          oneOf:
+            - type: object
+              required: [manufacturer, model, firmware, imei, imsi, iccid]
+              properties:
+                manufacturer: { type: string }
+                model: { type: string }
+                firmware: { type: string }
+                imei: { type: string }
+                imsi: { type: string }
+                iccid: { type: string }
+                ownNumber: { type: [string, "null"] }
+            - type: "null"
+        sim: { type: string, enum: [ready, pin, puk, absent, unknown] }
+        signal:
+          type: object
+          required: [rssi, dbm]
+          properties:
+            rssi: { type: [integer, "null"], minimum: 0, maximum: 31 }
+            dbm: { type: [integer, "null"] }
+        registration: { type: string, enum: [registered, roaming, searching, denied, not-registered, unknown] }
+        operator: { type: [string, "null"] }
+        rat: { type: [string, "null"], description: "无线接入技术，按设备自己的叫法，例如 \"FDD LTE\"。" }
+        band: { type: [string, "null"] }
+        volte: { type: [boolean, "null"] }
+        smsStorage:
+          oneOf:
+            - type: object
+              required: [used, total]
+              properties: { used: { type: integer }, total: { type: integer } }
+            - type: "null"
+        home:
+          type: object
+          description: SIM 卡的归属：每个号码都在它里面读（规范「号码」一节）。
+          required: [country, areaCode]
+          properties:
+            country: { type: [string, "null"], description: "SIM 卡发行国的 ISO 3166-1 两位码，取自 IMSI，没有时取手填本机号码的国家码；都说不了时为 null。" }
+            areaCode: { type: [string, "null"], description: "本机号码所属的区号，按国内拨号写法：国家把长途前缀写进区号的带上（\"0571\"、\"010\"），不写的不带（\"212\"）。用来认出 SIM 本地的固话；从不加到号码上。无法得知时为 null。" }
+        location:
+          type: object
+          description: 设备所在地。只用于显示，和读号码无关。
+          required: [country]
+          properties:
+            country: { type: [string, "null"], description: "设备当前注册网络所属国家的 ISO 3166-1 两位码；没注册且 SIM 也说不了时为 null。" }
+        updatedAt: { type: string, format: date-time }
+
+    Call:
+      type: object
+      required: [id, state, direction, number, contactId, place, startedAt, answeredAt]
+      properties:
+        id: { type: integer, description: "这通电话在通话记录里的 id。" }
+        state: { type: string, enum: [incoming, dialing, alerting, active, held, disconnecting] }
+        direction: { type: string, enum: [in, out] }
+        number: { type: [string, "null"], description: "号码隐藏或尚未得知时为 null。" }
+        contactId: { type: [integer, "null"] }
+        place: { type: [string, "null"], description: "有 `places` 特性时提供；一行文字，使用客户端的语言。" }
+        startedAt: { type: string, format: date-time }
+        answeredAt: { type: [string, "null"], format: date-time }
+
+    Holder:
+      type: object
+      required: [clientId, name]
+      properties:
+        clientId: { type: integer }
+        name: { type: string }
+
+    CallState:
+      type: object
+      required: [call, holder]
+      properties:
+        call: { oneOf: [{ $ref: "#/components/schemas/Call" }, { type: "null" }] }
+        holder: { oneOf: [{ $ref: "#/components/schemas/Holder" }, { type: "null" }] }
+
+    CallRecord:
+      type: object
+      required: [id, direction, peer, contactId, startedAt, answeredAt, endedAt, outcome, durationS, endReason, place, carrier]
+      properties:
+        id: { type: integer }
+        direction: { type: string, enum: [in, out] }
+        peer: { type: string, description: '保存形式；隐藏号码为 ""。' }
+        contactId: { type: [integer, "null"] }
+        startedAt: { type: string, format: date-time }
+        answeredAt: { type: [string, "null"], format: date-time }
+        endedAt: { type: [string, "null"], format: date-time }
+        outcome:
+          type: string
+          enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress]
+          description: "接通前 in-progress；通话中 answered（不会是最终值）；接通过的通话结束为 completed；答录机接的为 voicemail（从它手里接过来的改为 answered，结束为 completed）；没接通的来电为 missed；去电为 busy / no-answer / failed；rejected 可选（拒接）。见规范“通话记录”。"
+        durationS: { type: [integer, "null"], description: "从接通（答录机接的从它接起）到结束；没接通或没结束为 null。" }
+        endReason: { type: [string, "null"], description: "failed 时的原因，使用读者的语言；其他为 null。" }
+        place: { type: [string, "null"], description: "有 `places` 特性时提供。" }
+        carrier: { type: [string, "null"], description: "有 `places` 特性时提供。" }
+        seen: { type: boolean, description: "还没有人打开过的未接来电（或答录机接了却没留言的来电）为 false。" }
+
+    Conversation:
+      type: object
+      required: [peer, name, contactId, place, lastBody, lastAt, lastDirection, unread]
+      properties:
+        peer: { type: string }
+        name: { type: [string, "null"], description: "联系人名字，有 `contacts` 特性时提供。" }
+        contactId: { type: [integer, "null"] }
+        place: { type: [string, "null"], description: "有 `places` 特性时提供。" }
+        lastBody: { type: string }
+        lastAt: { type: string, format: date-time }
+        lastDirection: { type: string, enum: [in, out] }
+        unread: { type: integer, description: "收到的未读条数；回收站里的会话总是 0。" }
+
+    Message:
+      type: object
+      required: [id, direction, peer, body, status, createdAt, deviceTime, parts, error, read]
+      properties:
+        id: { type: integer }
+        direction: { type: string, enum: [in, out] }
+        peer: { type: string, description: '保存形式；没有数字的短信发件人（如 CMBCHINA 这样的名字）按来时的样子保存，去掉首尾空白。' }
+        body: { type: string }
+        status: { type: string, enum: [pending, sent, failed, received] }
+        createdAt: { type: string, format: date-time }
+        deviceTime: { type: [string, "null"], format: date-time, description: "来信上网络给出的时间戳。" }
+        parts:
+          oneOf:
+            - type: object
+              required: [received, total]
+              properties: { received: { type: integer }, total: { type: integer } }
+            - type: "null"
+          description: "分几段的短信：已到几段。收齐后（received 等于 total）仍保留；只有一段的短信为 null。"
+        error: { type: [string, "null"], description: "failed 的短信为什么失败；其他为 null。" }
+        read: { type: boolean }
+
+    Contact:
+      type: object
+      required: [id, firstName, lastName, name, numbers]
+      properties:
+        id: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        name: { type: string, description: "显示名：中日韩姓名姓在前不加空格，其它名在前。" }
+        numbers: { type: array, items: { type: string } }
+
+    Voicemail:
+      type: object
+      required: [id, callId, peer, at, durationS, heard, transcript, transcriptLanguage]
+      properties:
+        id: { type: integer }
+        callId: { type: [integer, "null"] }
+        peer: { type: string }
+        at: { type: string, format: date-time }
+        durationS: { type: integer }
+        heard: { type: boolean }
+        transcript: { type: [string, "null"], description: "什么都没转写出来时为 null（没有转写，或什么都没识别出来）。" }
+        transcriptLanguage: { type: [string, "null"], description: "重新转写时请求的语言（包括 auto）；实时转写为 null。" }
+
+    TranscriptionLanguage:
+      type: string
+      enum: [auto, zh, yue, en, ja, ko]
+
+    Settings:
+      type: object
+      required: [ownNumber, ownNumberSource]
+      properties:
+        ownNumber: { type: [string, "null"], description: "SIM 有号码时用 SIM 的，否则用手填的；按来时的样子保存，什么都不加。" }
+        ownNumberSource: { type: string, enum: [sim, manual, none] }
+        voicemail:
+          type: object
+          required: [enabled, answerAfterS, maxSeconds]
+          properties:
+            enabled: { type: boolean }
+            answerAfterS: { type: integer, minimum: 5, maximum: 120 }
+            maxSeconds: { type: integer, minimum: 5, maximum: 300 }
+        transcription:
+          type: object
+          required: [available, enabled, language, fallbackEnabled, fallbackLanguage]
+          properties:
+            available: { type: boolean, description: "语音模型已安装。" }
+            enabled: { type: boolean }
+            language: { $ref: "#/components/schemas/TranscriptionLanguage" }
+            fallbackEnabled: { type: boolean }
+            fallbackLanguage: { type: string, enum: [zh, yue, en, ja, ko] }
+
+    SettingsPatch:
+      type: object
+      properties:
+        ownNumber: { type: [string, "null"], description: "任何带数字的值，按来时的样子保存（去掉分隔符）；null 或 \"\" 清掉手填的号码。" }
+        voicemail:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            answerAfterS: { type: integer }
+            maxSeconds: { type: integer }
+        transcription:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            language: { $ref: "#/components/schemas/TranscriptionLanguage" }
+            fallbackEnabled: { type: boolean }
+            fallbackLanguage: { type: string }
+
+    SecurityState:
+      type: object
+      required: [ok, checkedAt, unacknowledged, checks]
+      properties:
+        ok: { type: boolean }
+        checkedAt: { type: [string, "null"], format: date-time }
+        unacknowledged: { type: integer }
+        checks:
+          type: array
+          description: "后端监视的项目，每项一行，使用客户端的语言。"
+          items:
+            type: object
+            required: [id, ok, text]
+            properties:
+              id: { type: string }
+              ok: { type: boolean }
+              severity: { type: string, enum: [warning, critical] }
+              text: { type: string }
+
+    SecurityAlert:
+      type: object
+      required: [id, at, severity, kind, title, detail, acknowledged]
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        severity: { type: string, enum: [warning, critical] }
+        kind: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        acknowledged: { type: boolean }
+
+    LogEvent:
+      type: object
+      required: [id, at, level, category, code, text]
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        level: { type: string, enum: [info, warn, error] }
+        category: { type: string, enum: [security, activity, devices, system] }
+        code: { type: string }
+        text: { type: string, description: "使用客户端的语言。" }

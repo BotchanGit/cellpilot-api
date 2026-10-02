@@ -1,0 +1,3220 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CellPilot Device API",
+    "version": "1",
+    "license": {
+      "name": "MIT"
+    },
+    "description": "The contract between the CellPilot app and a backend that controls a cellular device.\ndevice-api.md next to this file is the specification and wins on any disagreement; it covers the\nevent stream, audio frames, pairing, push and the relay, which OpenAPI cannot describe, and\nevents.schema.json defines every event frame. Routes marked `x-feature` exist only when the backend lists that\nfeature in `GET /v1`. Routes marked `x-optional` are core routes a backend may leave out\n(answering 404); the app does without them.\n"
+  },
+  "servers": [
+    {
+      "url": "{endpoint}/v1",
+      "variables": {
+        "endpoint": {
+          "default": "http://192.168.1.10:9400",
+          "description": "Any endpoint from GET /v1/client."
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "discovery"
+    },
+    {
+      "name": "client"
+    },
+    {
+      "name": "status"
+    },
+    {
+      "name": "call"
+    },
+    {
+      "name": "calls"
+    },
+    {
+      "name": "messages"
+    },
+    {
+      "name": "contacts"
+    },
+    {
+      "name": "voicemail"
+    },
+    {
+      "name": "settings"
+    },
+    {
+      "name": "security"
+    },
+    {
+      "name": "log"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "getDiscovery",
+        "tags": [
+          "discovery"
+        ],
+        "summary": "What this backend is and which features it has",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Backend description",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Discovery"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ping": {
+      "get": {
+        "operationId": "ping",
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Reachability and latency; does no work",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pair": {
+      "post": {
+        "operationId": "pair",
+        "tags": [
+          "client"
+        ],
+        "summary": "Exchange the code or token the backend handed out for a client token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "What the backend handed out: a six-digit code (as the reference backend hands out), or a backend's own token."
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "The phone's name."
+                  },
+                  "platform": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "default": "ios"
+                  },
+                  "lang": {
+                    "$ref": "#/components/schemas/LangTag"
+                  },
+                  "uid": {
+                    "type": "string",
+                    "description": "Installation id (identifierForVendor). Pairing again with the same uid replaces the earlier client."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "client",
+                    "endpoints"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "The bearer token. Shown once."
+                    },
+                    "client": {
+                      "$ref": "#/components/schemas/Client"
+                    },
+                    "endpoints": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Endpoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request: the code is missing or not a string, or the body is not a JSON object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/client": {
+      "get": {
+        "operationId": "getClient",
+        "tags": [
+          "client"
+        ],
+        "summary": "This client and the endpoints it may use",
+        "responses": {
+          "200": {
+            "description": "Client and endpoints",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientConfig"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateClient",
+        "tags": [
+          "client"
+        ],
+        "summary": "Update this client's name, language or installation id",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "lang": {
+                    "$ref": "#/components/schemas/LangTag"
+                  },
+                  "uid": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unpair",
+        "tags": [
+          "client"
+        ],
+        "summary": "Unpair this client",
+        "description": "The backend forgets the token and any push tokens. Anything still presenting the token gets 410.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          }
+        }
+      }
+    },
+    "/client/push-tokens": {
+      "post": {
+        "operationId": "registerPushToken",
+        "tags": [
+          "client"
+        ],
+        "summary": "Register an APNs token for this client",
+        "x-feature": "push",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "kind",
+                  "environment"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Hex APNs device token."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "alert",
+                      "voip"
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "sandbox",
+                      "production"
+                    ],
+                    "description": "Which APNs issued the token."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/client/push-tokens/{token}": {
+      "delete": {
+        "operationId": "unregisterPushToken",
+        "tags": [
+          "client"
+        ],
+        "summary": "Take back one of this client's push tokens",
+        "description": "The app does it with its VoIP token when the user turns the system call screen off. An unknown token is 200 too.",
+        "x-feature": "push",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          }
+        }
+      }
+    },
+    "/push": {
+      "get": {
+        "operationId": "getPushState",
+        "tags": [
+          "client"
+        ],
+        "summary": "How the backend sends pushes",
+        "x-feature": "push",
+        "responses": {
+          "200": {
+            "description": "Push state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/enrol": {
+      "post": {
+        "operationId": "enrolPush",
+        "tags": [
+          "client"
+        ],
+        "summary": "Enrol the backend on a push relay with a grant from this phone's account",
+        "x-feature": "push",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "relayUrl",
+                  "grant"
+                ],
+                "properties": {
+                  "relayUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "grant": {
+                    "type": "string",
+                    "description": "A one-time grant the relay issued to this phone's session."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The push state after enrolment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushState"
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/portal/session": {
+      "post": {
+        "operationId": "createPortalSession",
+        "tags": [
+          "client"
+        ],
+        "summary": "A short-lived way into the backend's web UI",
+        "x-feature": "portal",
+        "responses": {
+          "200": {
+            "description": "Where to go",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "url",
+                    "expiresInS"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresInS": {
+                      "type": "integer"
+                    },
+                    "cookies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "getStatus",
+        "tags": [
+          "status"
+        ],
+        "summary": "Backend, device, call and audio state",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "openEventStream",
+        "tags": [
+          "status"
+        ],
+        "summary": "The event stream (WebSocket upgrade)",
+        "description": "See the specification, *Event stream*. Sends `hello`, then events as JSON text frames; audio as binary frames.",
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LangTag"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switching Protocols"
+          }
+        }
+      }
+    },
+    "/call": {
+      "get": {
+        "operationId": "getCall",
+        "tags": [
+          "call"
+        ],
+        "summary": "The current call",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          }
+        }
+      }
+    },
+    "/call/dial": {
+      "post": {
+        "operationId": "dial",
+        "tags": [
+          "call"
+        ],
+        "summary": "Place a call",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "number"
+                ],
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "description": "As typed. Grouping (spaces, dashes, dots, brackets) is stripped, then 1–32 of 0-9 * # with an optional leading +. Dialled as typed."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/call/answer": {
+      "post": {
+        "operationId": "answer",
+        "tags": [
+          "call"
+        ],
+        "summary": "Answer the ringing call",
+        "description": "With `screening`, also takes over a call the backend is recording.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/call/hangup": {
+      "post": {
+        "operationId": "hangup",
+        "tags": [
+          "call"
+        ],
+        "summary": "End or reject the call",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/call/dtmf": {
+      "post": {
+        "operationId": "sendDtmf",
+        "tags": [
+          "call"
+        ],
+        "summary": "Send DTMF digits on the active call",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "digits"
+                ],
+                "properties": {
+                  "digits": {
+                    "type": "string",
+                    "pattern": "^[0-9*#]{1,32}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/call/screen": {
+      "post": {
+        "operationId": "screenCall",
+        "tags": [
+          "call"
+        ],
+        "summary": "Hand the ringing call to the backend's voicemail",
+        "x-feature": "screening",
+        "description": "Where the backend has no voicemail to hand it to, this is a hangup.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/call/claim": {
+      "post": {
+        "operationId": "claimCall",
+        "tags": [
+          "call"
+        ],
+        "summary": "Take a call the backend is holding",
+        "x-feature": "screening",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CallState"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/calls": {
+      "get": {
+        "operationId": "listCalls",
+        "tags": [
+          "calls"
+        ],
+        "summary": "Call history, newest first",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/beforeId"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "calls"
+                  ],
+                  "properties": {
+                    "calls": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CallRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/snapshot": {
+      "get": {
+        "operationId": "getSnapshot",
+        "x-feature": "snapshot",
+        "tags": [
+          "status"
+        ],
+        "summary": "Everything a client keeps, at one state version",
+        "responses": {
+          "200": {
+            "description": "rev, status, features, conversations, trash, calls, contacts, voicemails, settings, security, client, push, badge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calls/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "delete": {
+        "operationId": "deleteCall",
+        "tags": [
+          "calls"
+        ],
+        "summary": "Delete one record",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/calls/{id}/seen": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "post": {
+        "operationId": "markCallSeen",
+        "x-optional": true,
+        "tags": [
+          "calls"
+        ],
+        "summary": "Mark a missed call seen, for every client",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/conversations": {
+      "get": {
+        "operationId": "listConversations",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Conversations, newest first by their last message id",
+        "responses": {
+          "200": {
+            "description": "Conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "conversations"
+                  ],
+                  "properties": {
+                    "conversations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Conversation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{peer}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/peer"
+        }
+      ],
+      "delete": {
+        "operationId": "deleteConversation",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Delete a conversation (to the trash with the `trash` feature)",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          }
+        }
+      }
+    },
+    "/conversations/{peer}/messages": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/peer"
+        }
+      ],
+      "get": {
+        "operationId": "listMessages",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Messages with one peer, newest first",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/beforeId"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Messages"
+          }
+        }
+      }
+    },
+    "/conversations/{peer}/read": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/peer"
+        }
+      ],
+      "post": {
+        "operationId": "markConversationRead",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Mark the conversation read",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/messages": {
+      "post": {
+        "operationId": "sendMessage",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Send a message",
+        "description": "Answers with the message as recorded: `pending`, or — when the backend waits for the module (the reference backend does) — already `sent` or `failed`. The app takes either. `message` events follow (pending, then sent/failed), then `conversations`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "to",
+                  "text"
+                ],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "description": "As typed. Grouping is stripped, then 3–20 digits with an optional leading +."
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/messages/search": {
+      "get": {
+        "operationId": "searchMessages",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Search message text",
+        "x-feature": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Messages"
+          }
+        }
+      }
+    },
+    "/messages/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "delete": {
+        "operationId": "deleteMessage",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Delete one message for good",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/messages/{id}/trash": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "post": {
+        "operationId": "trashMessage",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Move one message to the trash",
+        "x-feature": "trash",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/trash": {
+      "get": {
+        "operationId": "listTrash",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Conversations in the trash",
+        "x-feature": "trash",
+        "responses": {
+          "200": {
+            "description": "Trashed conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "conversations"
+                  ],
+                  "properties": {
+                    "conversations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Conversation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trash/restore": {
+      "post": {
+        "operationId": "restoreConversations",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Restore conversations from the trash",
+        "x-feature": "trash",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Peers"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/trash/purge": {
+      "post": {
+        "operationId": "purgeConversations",
+        "tags": [
+          "messages"
+        ],
+        "summary": "Delete trashed conversations for good",
+        "x-feature": "trash",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Peers"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "operationId": "listContacts",
+        "tags": [
+          "contacts"
+        ],
+        "summary": "People with names and numbers",
+        "x-feature": "contacts",
+        "responses": {
+          "200": {
+            "description": "The contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "contacts"
+                  ],
+                  "properties": {
+                    "contacts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Contact"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createContact",
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Create a contact",
+        "x-feature": "contacts",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/ContactInput"
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "contact"
+                  ],
+                  "properties": {
+                    "contact": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/contacts/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "put": {
+        "operationId": "replaceContact",
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Replace a contact's name and numbers",
+        "x-feature": "contacts",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/ContactInput"
+        },
+        "responses": {
+          "200": {
+            "description": "The contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "contact"
+                  ],
+                  "properties": {
+                    "contact": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteContact",
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Delete a contact",
+        "x-feature": "contacts",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/voicemails": {
+      "get": {
+        "operationId": "listVoicemails",
+        "tags": [
+          "voicemail"
+        ],
+        "summary": "Recordings, newest first",
+        "x-feature": "voicemail",
+        "parameters": [
+          {
+            "name": "peer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recordings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "voicemails"
+                  ],
+                  "properties": {
+                    "voicemails": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Voicemail"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/voicemails/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "delete": {
+        "operationId": "deleteVoicemail",
+        "tags": [
+          "voicemail"
+        ],
+        "summary": "Delete a recording",
+        "x-feature": "voicemail",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/voicemails/{id}/audio": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "get": {
+        "operationId": "getVoicemailAudio",
+        "tags": [
+          "voicemail"
+        ],
+        "summary": "The recording itself",
+        "x-feature": "voicemail",
+        "description": "Fetching it marks the recording heard.",
+        "responses": {
+          "200": {
+            "description": "WAV audio",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/voicemails/{id}/transcribe": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "post": {
+        "operationId": "transcribeVoicemail",
+        "tags": [
+          "voicemail"
+        ],
+        "summary": "Transcribe a recording",
+        "x-feature": "transcription",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "$ref": "#/components/schemas/TranscriptionLanguage"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcript",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "transcript",
+                    "language"
+                  ],
+                  "properties": {
+                    "transcript": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The language asked for (auto when none was); also stored as the voicemail's transcriptLanguage."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "tags": [
+          "settings"
+        ],
+        "summary": "Backend settings the user may change",
+        "x-feature": "settings",
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSettings",
+        "tags": [
+          "settings"
+        ],
+        "summary": "Change settings",
+        "x-feature": "settings",
+        "description": "Send only what changes. Sections belong to features (`voicemail`, `transcription`); a backend without the feature omits the section.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings after the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/security": {
+      "get": {
+        "operationId": "getSecurity",
+        "tags": [
+          "security"
+        ],
+        "summary": "Security checks and alerts",
+        "x-feature": "security",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Include acknowledged alerts."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State and alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "state",
+                    "alerts"
+                  ],
+                  "properties": {
+                    "state": {
+                      "$ref": "#/components/schemas/SecurityState"
+                    },
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SecurityAlert"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/alerts/{id}/ack": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/id"
+        }
+      ],
+      "post": {
+        "operationId": "acknowledgeAlert",
+        "tags": [
+          "security"
+        ],
+        "summary": "Acknowledge one alert",
+        "x-feature": "security",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/security/alerts/ack": {
+      "post": {
+        "operationId": "acknowledgeAllAlerts",
+        "tags": [
+          "security"
+        ],
+        "summary": "Acknowledge every alert",
+        "x-feature": "security",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Empty"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/log": {
+      "get": {
+        "operationId": "listLog",
+        "tags": [
+          "log"
+        ],
+        "summary": "The backend's event log, newest first",
+        "x-feature": "log",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/beforeId"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "events"
+                  ],
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LogEvent"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The client token."
+      }
+    },
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "peer": {
+        "name": "peer",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "The number, percent-encoded."
+      },
+      "beforeId": {
+        "name": "beforeId",
+        "in": "query",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Return items with an id lower than this. Not a number is ignored."
+      },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 500
+        },
+        "description": "Clamped to 1–500 rather than refused; not a number is ignored. A route may name its own default and cap (search 50/200, log 200/1000)."
+      }
+    },
+    "requestBodies": {
+      "ContactInput": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "lastName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "numbers": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "At most 20. Each is kept in its stored form (grouping stripped), cut to 32 characters; one with no digit is dropped, none is refused for its shape. The same number string given to this contact is taken from any other."
+                }
+              }
+            }
+          }
+        }
+      },
+      "Peers": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "peers"
+              ],
+              "properties": {
+                "peers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "maxItems": 500
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Empty": {
+        "description": "Done",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "Error": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "CallState": {
+        "description": "The call after the action",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CallState"
+            }
+          }
+        }
+      },
+      "Messages": {
+        "description": "Messages",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "messages"
+              ],
+              "properties": {
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Lang": {
+        "type": "string",
+        "enum": [
+          "en",
+          "zh"
+        ]
+      },
+      "LangTag": {
+        "type": "string",
+        "description": "Any language tag. One starting with zh (zh, zh-Hans) means Chinese; anything else English."
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "invalid_request",
+                  "unauthorized",
+                  "forbidden",
+                  "not_found",
+                  "feature_unavailable",
+                  "conflict",
+                  "signed_out",
+                  "rate_limited",
+                  "device_unavailable",
+                  "internal",
+                  "upstream_failed"
+                ],
+                "description": "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer."
+              },
+              "message": {
+                "type": "string",
+                "description": "For people, in the reader's language."
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "description": "The field that was wrong; nested fields joined with dots (\"voicemail.answerAfterS\")."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Discovery": {
+        "type": "object",
+        "required": [
+          "api",
+          "version",
+          "backend",
+          "features"
+        ],
+        "properties": {
+          "api": {
+            "type": "string",
+            "const": "cellpilot-device-api"
+          },
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "features": {
+            "type": "array",
+            "description": "Features this backend has now. Known: push, portal, contacts, search, trash, voicemail, transcription, settings, security, log, places, screening, snapshot, notify; a client ignores any other.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Backend": {
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "uptimeS": {
+            "type": "integer"
+          }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "lang"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lang": {
+            "$ref": "#/components/schemas/Lang"
+          }
+        }
+      },
+      "Endpoint": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "url",
+          "priority"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "description": "Shown to the user."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Base URL, without /v1."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Lower is preferred."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Added to every request and to the event stream through this endpoint."
+          },
+          "tokenHeader": {
+            "type": "string",
+            "enum": [
+              "X-CellPilot-Token"
+            ],
+            "description": "\"X-CellPilot-Token\" when a proxy on this path takes Authorization for itself; the client then sends its token there and leaves Authorization alone. Absent: Authorization: Bearer."
+          },
+          "tlsPin": {
+            "type": "string",
+            "description": "SHA-256 of the server certificate (DER), base64. The client trusts that certificate for this endpoint and refuses any other: for a self-signed one."
+          },
+          "clientCertificate": {
+            "type": "object",
+            "required": [
+              "p12",
+              "password"
+            ],
+            "description": "A client certificate the server asks for (mutual TLS): a PKCS#12 bundle, base64, and its password.",
+            "properties": {
+              "p12": {
+                "type": "string",
+                "contentEncoding": "base64"
+              },
+              "password": {
+                "type": "string"
+              }
+            }
+          },
+          "vpn": {
+            "type": "string",
+            "description": "The VPN the phone must be on to reach this endpoint (\"Tailscale\"), named for the app to say so when it does not answer."
+          }
+        }
+      },
+      "ClientConfig": {
+        "type": "object",
+        "required": [
+          "client",
+          "endpoints"
+        ],
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/Client"
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endpoint"
+            }
+          },
+          "pushTokens": {
+            "type": "array",
+            "description": "With push: the tokens the backend holds for this client.",
+            "items": {
+              "type": "object",
+              "required": [
+                "token",
+                "kind"
+              ],
+              "properties": {
+                "token": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "alert",
+                    "voip"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "PushState": {
+        "type": "object",
+        "required": [
+          "mode",
+          "relay"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "relay",
+              "direct"
+            ],
+            "description": "none: no way to push yet; relay: enrolled on the relay. direct: reserved; a backend reports none or relay."
+          },
+          "relay": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "url",
+                  "daemonId"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "daemonId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem": {
+            "description": "Optional. Why pushes are not getting through; null or absent once one does.",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "code",
+                  "at"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "suspended",
+                      "not-entitled",
+                      "quota",
+                      "rate",
+                      "not-enrolled",
+                      "unbound",
+                      "apns",
+                      "unreachable"
+                    ]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "quota": {
+                    "type": "integer"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Snapshot": {
+        "type": "object",
+        "description": "Everything a client keeps, at one rev.",
+        "required": [
+          "rev",
+          "status",
+          "features",
+          "conversations",
+          "trash",
+          "calls",
+          "voicemails",
+          "client",
+          "badge",
+          "contacts",
+          "settings",
+          "security",
+          "push"
+        ],
+        "properties": {
+          "rev": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            }
+          },
+          "trash": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "description": "The trash; [] without the trash feature."
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallRecord"
+            },
+            "description": "The newest page of the history (100 records)."
+          },
+          "voicemails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Voicemail"
+            },
+            "description": "[] without the voicemail feature."
+          },
+          "client": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClientConfig"
+              }
+            ],
+            "description": "This client, with pushTokens."
+          },
+          "badge": {
+            "type": "integer",
+            "description": "The icon badge."
+          },
+          "contacts": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null without the contacts feature."
+          },
+          "settings": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Settings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null without the settings feature."
+          },
+          "security": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "state",
+                  "alerts"
+                ],
+                "properties": {
+                  "state": {
+                    "$ref": "#/components/schemas/SecurityState"
+                  },
+                  "alerts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SecurityAlert"
+                    },
+                    "description": "The unacknowledged alerts."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null without the security feature."
+          },
+          "push": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PushState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null without the push feature."
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "required": [
+          "backend",
+          "device",
+          "call",
+          "holder",
+          "audio"
+        ],
+        "properties": {
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "device": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Device"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "call": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Call"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holder": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Holder"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "audio": {
+            "type": "object",
+            "required": [
+              "ready",
+              "active"
+            ],
+            "properties": {
+              "ready": {
+                "type": "boolean",
+                "description": "The backend can carry call audio."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Audio is flowing now."
+              }
+            }
+          },
+          "security": {
+            "$ref": "#/components/schemas/SecurityState",
+            "description": "Only with the `security` feature."
+          }
+        }
+      },
+      "Device": {
+        "type": "object",
+        "required": [
+          "connected",
+          "sim",
+          "signal",
+          "registration",
+          "operator",
+          "rat",
+          "volte",
+          "home",
+          "location",
+          "updatedAt"
+        ],
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "identity": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "manufacturer",
+                  "model",
+                  "firmware",
+                  "imei",
+                  "imsi",
+                  "iccid"
+                ],
+                "properties": {
+                  "manufacturer": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "firmware": {
+                    "type": "string"
+                  },
+                  "imei": {
+                    "type": "string"
+                  },
+                  "imsi": {
+                    "type": "string"
+                  },
+                  "iccid": {
+                    "type": "string"
+                  },
+                  "ownNumber": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sim": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pin",
+              "puk",
+              "absent",
+              "unknown"
+            ]
+          },
+          "signal": {
+            "type": "object",
+            "required": [
+              "rssi",
+              "dbm"
+            ],
+            "properties": {
+              "rssi": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 31
+              },
+              "dbm": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "registration": {
+            "type": "string",
+            "enum": [
+              "registered",
+              "roaming",
+              "searching",
+              "denied",
+              "not-registered",
+              "unknown"
+            ]
+          },
+          "operator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Radio access technology as the device names it, e.g. \"FDD LTE\"."
+          },
+          "band": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "volte": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "smsStorage": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "used",
+                  "total"
+                ],
+                "properties": {
+                  "used": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "home": {
+            "type": "object",
+            "description": "The SIM's home: what every number is read in (the specification, *Numbers*).",
+            "required": [
+              "country",
+              "areaCode"
+            ],
+            "properties": {
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "ISO 3166-1 alpha-2 of the country that issued the SIM, from the IMSI, or without one from the country code of the own number entered by hand; null when neither tells."
+              },
+              "areaCode": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The area code of the place the SIM's own number belongs to, as dialled nationally: with the trunk prefix where the country writes it (\"0571\", \"010\"), without where it does not (\"212\"). Reads a local landline of the SIM's own area; never added to a number. Null when it cannot be told."
+              }
+            }
+          },
+          "location": {
+            "type": "object",
+            "description": "Where the device is. For display; plays no part in reading numbers.",
+            "required": [
+              "country"
+            ],
+            "properties": {
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "ISO 3166-1 alpha-2 of the network the device is registered on; null when not registered and no SIM says."
+              }
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Call": {
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "direction",
+          "number",
+          "contactId",
+          "place",
+          "startedAt",
+          "answeredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The history record this call becomes."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "incoming",
+              "dialing",
+              "alerting",
+              "active",
+              "held",
+              "disconnecting"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Null when withheld or not yet known."
+          },
+          "contactId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With the `places` feature; one line, in the client's language."
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answeredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Holder": {
+        "type": "object",
+        "required": [
+          "clientId",
+          "name"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CallState": {
+        "type": "object",
+        "required": [
+          "call",
+          "holder"
+        ],
+        "properties": {
+          "call": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Call"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holder": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Holder"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CallRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "peer",
+          "contactId",
+          "startedAt",
+          "answeredAt",
+          "endedAt",
+          "outcome",
+          "durationS",
+          "endReason",
+          "place",
+          "carrier"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "peer": {
+            "type": "string",
+            "description": "The stored form; \"\" for a withheld number."
+          },
+          "contactId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answeredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "completed",
+              "missed",
+              "rejected",
+              "busy",
+              "no-answer",
+              "failed",
+              "voicemail",
+              "in-progress"
+            ],
+            "description": "in-progress until connected; answered while connected (never final); completed once a connected call ends; voicemail when the answering machine took it (a call taken over from it becomes answered, then completed); missed for an incoming call never connected; busy / no-answer / failed for an outgoing one; rejected optional (declined). See the specification, *The history*."
+          },
+          "durationS": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "From connecting (the machine's pickup for one it took) to the end; null if it never connected or has not ended."
+          },
+          "endReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why a failed call failed, in the reader's language; null otherwise."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With the `places` feature."
+          },
+          "carrier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With the `places` feature."
+          },
+          "seen": {
+            "type": "boolean",
+            "description": "False for a missed call (or one the voicemail took without a message) nobody has opened yet."
+          }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "required": [
+          "peer",
+          "name",
+          "contactId",
+          "place",
+          "lastBody",
+          "lastAt",
+          "lastDirection",
+          "unread"
+        ],
+        "properties": {
+          "peer": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The contact name, with the `contacts` feature."
+          },
+          "contactId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "With the `places` feature."
+          },
+          "lastBody": {
+            "type": "string"
+          },
+          "lastAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastDirection": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "unread": {
+            "type": "integer",
+            "description": "Unread incoming messages; always 0 for a conversation in the trash."
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "peer",
+          "body",
+          "status",
+          "createdAt",
+          "deviceTime",
+          "parts",
+          "error",
+          "read"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "peer": {
+            "type": "string",
+            "description": "The stored form; an SMS sender with no digits (a name such as CMBCHINA) is kept as it came, trimmed."
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "sent",
+              "failed",
+              "received"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deviceTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The network's timestamp on an incoming message."
+          },
+          "parts": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "received",
+                  "total"
+                ],
+                "properties": {
+                  "received": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a message of several parts: how many have arrived. Kept once complete (received equal to total); null for a message of one part."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why a failed message failed; null otherwise."
+          },
+          "read": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "name",
+          "numbers"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "As displayed: family name first without a space for CJK names, given name first otherwise."
+          },
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Voicemail": {
+        "type": "object",
+        "required": [
+          "id",
+          "callId",
+          "peer",
+          "at",
+          "durationS",
+          "heard",
+          "transcript",
+          "transcriptLanguage"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "callId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "peer": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationS": {
+            "type": "integer"
+          },
+          "heard": {
+            "type": "boolean"
+          },
+          "transcript": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null when nothing was transcribed (no transcription, or nothing recognised)."
+          },
+          "transcriptLanguage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The language a re-transcription asked for (auto included); null for the live transcript."
+          }
+        }
+      },
+      "TranscriptionLanguage": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "zh",
+          "yue",
+          "en",
+          "ja",
+          "ko"
+        ]
+      },
+      "Settings": {
+        "type": "object",
+        "required": [
+          "ownNumber",
+          "ownNumberSource"
+        ],
+        "properties": {
+          "ownNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The SIM's number when it has one, else the one typed; stored as it came, nothing added."
+          },
+          "ownNumberSource": {
+            "type": "string",
+            "enum": [
+              "sim",
+              "manual",
+              "none"
+            ]
+          },
+          "voicemail": {
+            "type": "object",
+            "required": [
+              "enabled",
+              "answerAfterS",
+              "maxSeconds"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "answerAfterS": {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 120
+              },
+              "maxSeconds": {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 300
+              }
+            }
+          },
+          "transcription": {
+            "type": "object",
+            "required": [
+              "available",
+              "enabled",
+              "language",
+              "fallbackEnabled",
+              "fallbackLanguage"
+            ],
+            "properties": {
+              "available": {
+                "type": "boolean",
+                "description": "Models are installed."
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "language": {
+                "$ref": "#/components/schemas/TranscriptionLanguage"
+              },
+              "fallbackEnabled": {
+                "type": "boolean"
+              },
+              "fallbackLanguage": {
+                "type": "string",
+                "enum": [
+                  "zh",
+                  "yue",
+                  "en",
+                  "ja",
+                  "ko"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "SettingsPatch": {
+        "type": "object",
+        "properties": {
+          "ownNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Any value with a digit, stored as it came (grouping stripped); null or \"\" clears the typed number."
+          },
+          "voicemail": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "answerAfterS": {
+                "type": "integer"
+              },
+              "maxSeconds": {
+                "type": "integer"
+              }
+            }
+          },
+          "transcription": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "language": {
+                "$ref": "#/components/schemas/TranscriptionLanguage"
+              },
+              "fallbackEnabled": {
+                "type": "boolean"
+              },
+              "fallbackLanguage": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SecurityState": {
+        "type": "object",
+        "required": [
+          "ok",
+          "checkedAt",
+          "unacknowledged",
+          "checks"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "unacknowledged": {
+            "type": "integer"
+          },
+          "checks": {
+            "type": "array",
+            "description": "What the backend watches, one line each, in the client's language.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "ok",
+                "text"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "warning",
+                    "critical"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SecurityAlert": {
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "severity",
+          "kind",
+          "title",
+          "detail",
+          "acknowledged"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "critical"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "acknowledged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LogEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "level",
+          "category",
+          "code",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warn",
+              "error"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "security",
+              "activity",
+              "devices",
+              "system"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "In the client's language."
+          }
+        }
+      }
+    }
+  }
+}

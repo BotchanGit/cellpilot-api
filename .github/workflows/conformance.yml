@@ -1,0 +1,38 @@
+name: conformance
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  mock-backend:
+    name: api-check against mock-backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The schemas parse and every reference resolves
+        run: |
+          node -e '
+            const fs = require("fs");
+            const openapi = JSON.parse(fs.readFileSync("spec/openapi.json", "utf8"));
+            const events = JSON.parse(fs.readFileSync("spec/events.schema.json", "utf8"));
+            JSON.parse(fs.readFileSync("fixtures/number-rules.json", "utf8"));
+            const resolve = (ref, doc) => { const [f, p = ""] = ref.split("#"); let n = f === "openapi.json" ? openapi : doc; for (const k of p.split("/").filter(Boolean)) n = n?.[k]; return n; };
+            const walk = (o, doc) => { if (Array.isArray(o)) o.forEach((x) => walk(x, doc)); else if (o && typeof o === "object") for (const [k, v] of Object.entries(o)) { if (k === "$ref") { if (resolve(v, doc) === undefined) throw new Error(`${v} does not resolve`); } else walk(v, doc); } };
+            walk(events, events); walk(openapi, openapi); console.log("schemas ok");'
+      - name: Start mock-backend
+        run: |
+          node tools/mock-backend.mjs --port 8799 --host 127.0.0.1 --code 123456 > mock.log 2>&1 &
+          for i in $(seq 1 50); do curl -sf http://127.0.0.1:8799/v1/ping && break; sleep 0.2; done
+      - name: api-check, every mode
+        run: |
+          TOKEN=$(curl -s -X POST http://127.0.0.1:8799/v1/pair -d '{"code":"123456","name":"ci"}' \
+            | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).token')
+          node tools/api-check.mjs --url http://127.0.0.1:8799 --token "$TOKEN" \
+            --write --to +15555550101 --dial --sim --code 123456
+      - name: mock-backend log
+        if: always()
+        run: cat mock.log
