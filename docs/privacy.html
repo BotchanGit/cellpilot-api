@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CellPilot Privacy Policy</title>
+<style>
+  :root {
+    --ground: #fbfbf9; --ink: #1d232b; --muted: #5d6672; --line: #e2e4e0; --accent: #1f5f8b;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground: #111519; --ink: #e6e9ec; --muted: #9aa4ae; --line: #2a3138; --accent: #7fb6dd; color-scheme: dark; }
+  }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+    font: 16px/1.65 -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding-block: 3rem 4rem; padding-inline: 20px; }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 .3rem; text-wrap: balance; }
+  h2 { font-size: 1.15rem; margin: 2.2rem 0 .5rem; }
+  .meta { color: var(--muted); margin: 0 0 1.6rem; }
+  .lang { margin: 0 0 2rem; }
+  a { color: var(--accent); }
+  ul { padding-left: 1.25rem; }
+  li { margin: .3rem 0; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 3.5rem 0; }
+  code { font: .9em ui-monospace, Menlo, monospace; }
+</style>
+<main>
+
+<section id="en" lang="en">
+<h1>CellPilot Privacy Policy</h1>
+<p class="meta">Effective 3 October 2026</p>
+<p class="lang"><b>English</b> · <a href="#zh">简体中文</a></p>
+
+<p>CellPilot is an iPhone app that works with a backend you run yourself, next to your own
+cellular module and SIM card. This policy explains what the app and the CellPilot push relay
+handle, and what we, the developer of CellPilot, can and cannot see.</p>
+
+<h2>Your messages, calls and contacts</h2>
+<p>Your SMS messages, call history, voicemails, transcripts and contacts live on your backend and on
+your iPhone. The app talks to your backend directly — on your network, or through the remote
+access you set up — and none of this content passes through or is stored on any server of ours.
+We never receive it.</p>
+
+<h2>On your iPhone</h2>
+<ul>
+  <li>The pairing token and the addresses of your backend are kept in the iOS Keychain. The app
+    keeps a copy of your conversations, calls and voicemails on the device so it opens quickly.
+    Unpairing removes them.</li>
+  <li><b>Microphone</b>: used only during calls, to carry your voice to your backend.</li>
+  <li><b>Contacts</b>: read or written only when you choose to import or export contacts.</li>
+  <li><b>Local network</b>: used to find and reach your backend on your own network.</li>
+</ul>
+
+<h2>The push relay (optional)</h2>
+<p>To wake your iPhone when the app is closed, your backend sends notifications through the
+CellPilot push relay, which passes them to Apple Push Notification service. Using it requires
+Sign in with Apple.</p>
+<ul>
+  <li><b>What the relay keeps</b>: Apple's identifier for your account (we ask for no name and no
+    email), your devices' push tokens, the backends you enrolled (an identifier, a public key and a
+    label), the invite you redeemed, and daily counts of the notifications sent.</li>
+  <li><b>What it cannot read</b>: the content of each notification is encrypted on your backend
+    with a key only your iPhone and your backend hold. A backend that follows the CellPilot Device
+    API sends nothing readable to the relay but a short generic title (such as “New message”) and
+    the badge count.</li>
+  <li><b>What it sees to deliver</b>: when each notification is sent, to which device, and the
+    network address of the backend sending it.</li>
+</ul>
+
+<h2>Share Usage Data</h2>
+<p>If <b>Share Usage Data</b> is on (Settings › Diagnostics), the app sends its own log to the
+relay so we can find and fix problems: what the app did and when, errors, crash and hang reports,
+the app and iOS versions, the iPhone model and a random identifier for this installation. The log
+never contains message text, phone numbers or contacts. It is on by default in TestFlight beta
+builds and off by default otherwise; you can turn it off at any time. Logs are kept for 30 days.</p>
+
+<h2>What we do not do</h2>
+<p>No advertising, no tracking across apps or websites, no third-party analytics, and we do not
+sell or share your data. Data is used only to run the relay and to improve CellPilot.</p>
+
+<h2>Where it is processed</h2>
+<p>The relay runs on Cloudflare's network, which processes network addresses to deliver requests.
+Notifications are delivered by Apple Push Notification service.</p>
+
+<h2>Deleting your data</h2>
+<p>In the app's Settings, <b>Delete Account</b> (shown once you are signed in to the push relay) deletes your relay account and
+everything the relay keeps for it — push tokens, enrolled backends, usage counts and logs — at
+once. Unpairing removes what the app keeps on your iPhone. Your backend's data is under your own
+control.</p>
+
+<h2>Children</h2>
+<p>CellPilot is not directed at children under 13.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the new version will be posted on this page with a new effective
+date. Questions: <a href="mailto:privacy@cellpilot.dev">privacy@cellpilot.dev</a>.</p>
+</section>
+
+<hr>
+
+<section id="zh" lang="zh-Hans">
+<h1>CellPilot 隐私政策</h1>
+<p class="meta">生效日期：2026 年 10 月 3 日</p>
+<p class="lang"><a href="#en">English</a> · <b>简体中文</b></p>
+
+<p>CellPilot 是一个 iPhone App，配合你自己运行的后端使用，后端接着你自己的蜂窝模块和 SIM 卡。本政策说明
+App 和 CellPilot 推送中转处理哪些数据，以及我们作为 CellPilot 的开发者能看到什么、看不到什么。</p>
+
+<h2>你的短信、通话和联系人</h2>
+<p>你的短信、通话记录、留言、转写和联系人保存在你的后端和你的 iPhone 上。App 直接连接你的后端——在你的
+网络里，或经你自己设置的远程访问——这些内容不经过、也不保存在我们的任何服务器上。我们收不到它们。</p>
+
+<h2>在你的 iPhone 上</h2>
+<ul>
+  <li>配对令牌和后端地址保存在 iOS 钥匙串里。App 在本机保存会话、通话和留言的副本，以便快速打开。取消配对会删除它们。</li>
+  <li><b>麦克风</b>：只在通话时使用，把你的声音传给你的后端。</li>
+  <li><b>通讯录</b>：只在你选择导入或导出联系人时读写。</li>
+  <li><b>本地网络</b>：用于在你自己的网络里找到并连接你的后端。</li>
+</ul>
+
+<h2>推送中转（可选）</h2>
+<p>为了在 App 关着时唤醒你的 iPhone，你的后端通过 CellPilot 推送中转发送通知，再由中转交给 Apple 推送
+通知服务。使用中转需要"通过 Apple 登录"。</p>
+<ul>
+  <li><b>中转保存的</b>：Apple 给你账号的标识（我们不索取姓名和邮箱）、你设备的推送 token、你登记的后端
+    （一个标识、一把公钥和一个名称）、你兑换的邀请码，以及每天发送通知的数量。</li>
+  <li><b>中转读不到的</b>：每条通知的内容都在你的后端用只有你的 iPhone 和你的后端持有的密钥加密。遵循
+    CellPilot 设备 API 的后端，发给中转的可读内容只有一个简短的通用标题（如"新消息"）和角标数。</li>
+  <li><b>为了投递而能看到的</b>：每条通知的发送时间、发往哪台设备，以及发送它的后端的网络地址。</li>
+</ul>
+
+<h2>共享使用数据</h2>
+<p>打开<b>共享使用数据</b>（设置 › 诊断）时，App 会把自己的日志发给中转，帮助我们发现和修复问题：App
+做了什么、什么时候、出了什么错、崩溃和卡顿报告、App 和 iOS 版本、iPhone 型号，以及这次安装的随机标识。
+日志从不包含短信内容、电话号码或联系人。TestFlight 测试版默认打开，其他版本默认关闭，你随时可以关掉。
+日志保存 30 天。</p>
+
+<h2>我们不做的事</h2>
+<p>没有广告，不跨 App 或网站追踪你，不使用第三方统计，也不出售或分享你的数据。数据只用于运行中转和改进
+CellPilot。</p>
+
+<h2>在哪里处理</h2>
+<p>中转运行在 Cloudflare 的网络上，为了送达请求会处理网络地址。通知由 Apple 推送通知服务投递。</p>
+
+<h2>删除你的数据</h2>
+<p>在 App 的设置里点<b>删除账号</b>（登录推送中转后才会出现），会立即删除你的中转账号和中转为它保存的一切——推送 token、
+登记的后端、使用计数和日志。取消配对会删除 App 在 iPhone 上保存的内容。你后端里的数据由你自己掌握。</p>
+
+<h2>儿童</h2>
+<p>CellPilot 不面向 13 岁以下的儿童。</p>
+
+<h2>变更与联系</h2>
+<p>本政策如有变更，新版本会发布在本页并更新生效日期。有问题请联系：
+<a href="mailto:privacy@cellpilot.dev">privacy@cellpilot.dev</a>。</p>
+</section>
+
+</main>
+</html>
