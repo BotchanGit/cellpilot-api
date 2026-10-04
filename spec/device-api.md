@@ -457,23 +457,23 @@ record (`CallRecord`) is made when a call starts and written at three moments:
 | `in-progress` | Not connected yet. |
 | `answered` | Connected and still going on; never a final value. |
 | `completed` | Connected and ended, whoever hung up. |
-| `voicemail` | The answering machine took it. A call a client took over from the machine (`claim`, or `answer` while it records) becomes `answered` and ends `completed`. |
-| `missed` | Incoming and never connected: the caller gave up, it was declined, nobody answered. `seen` becomes `false`. |
+| `voicemail` | The answering machine took it and kept a message. A call a client took over from the machine (`claim`, or `answer` while it records) becomes `answered` and ends `completed`. |
+| `missed` | Incoming and never connected: the caller gave up, it was declined, nobody answered — or the answering machine took it and got no message (*The answering machine*). `seen` becomes `false`. |
 | `busy`, `no-answer` | Outgoing, the far end busy or not answering, when the module says so; a backend that cannot tell records `failed`. |
 | `failed` | Outgoing and never connected for any other reason, the caller hanging up before an answer included; `endReason` says why when the network did. |
 | `rejected` | Incoming and declined. Optional: `cellpilotd` records a declined call as `missed`; the app shows `rejected` as declined. |
 
 A record left open when the backend restarts or the device goes away is closed then: never
 connected (`in-progress`) is `failed`; `answered` is `completed`, ended then, its duration up to
-then; `voicemail` stays `voicemail`, ended then. `endReason` is `null` unless the outcome is
+then; `voicemail` stays `voicemail`, ended then, if the machine kept a message, and is
+`missed` (`answeredAt` and `durationS` `null`) if not — a recording a restart cut off is lost. `endReason` is `null` unless the outcome is
 `failed`. `peer` is `""` for a withheld number. The app shows `answered` and `completed` alike,
 counts `missed` and `voicemail` as missed, and `in-progress` as going on.
 
 The `calls` event (the newest page; its length is the backend's — `cellpilotd` sends 50) goes out
 when a record ends, is seen or deleted, or a contact's name changes; not when a call starts or
 connects, which the `call` event covers. `place`/`carrier` come with the `places` feature, and
-`seen` is `false` for a missed call (or one the machine took with under a second recorded) that
-nobody has opened yet; every other record is `seen: true` from the start — outgoing, answered, and
+`seen` is `false` for a missed call that nobody has opened yet; every other record is `seen: true` from the start — outgoing, answered, and
 a voicemail with a message, which counts through its `heard` instead. `POST /v1/calls/{id}/seen` marks it seen for every client — `200` also when it
 already was, `404 not_found` for no such record — and sends `calls` when `seen` changed; the app
 calls it only for records with `seen: false` and ignores a failure. `DELETE /v1/calls/{id}` is
@@ -634,17 +634,24 @@ and the app are both tested against; a backend of your own can run the same tabl
 
 The machine picks up a call that rang `settings.voicemail.answerAfterS` seconds unanswered
 (`reason: "no-answer"`; not when it is switched off), or one a client handed it with `screen`
-(`reason: "declined"`). The call is then `active` with `holder: null` and its record `voicemail`.
+(`reason: "declined"`). It picks up only with call audio flowing; without it — the audio path
+failed to start — the backend hangs up instead, and the call is a missed one. The call is then
+`active` with `holder: null` and its record `voicemail`.
 Once recording starts it sends `{ "type": "voicemail", "recording": true, "peer", "reason",
 "transcript": "" }`; with transcription, one more per recognised piece, `transcript` being the
 whole text so far and `delta` the new part. It ends when the caller hangs up, at `maxSeconds`
 (the backend hangs up), or when a client takes the call over; then `recording: false` and the
 final `transcript` (`""` without transcription, never `null`, in the event; the saved voicemail's
-`transcript` is `null` when nothing was transcribed). A recording of at least one second
-— by its length, silent or not — becomes a voicemail (`voicemails` event, `voicemail` push); a
-shorter one leaves none, and the record's `seen` goes `false` with a `missed-call` push instead.
-A take-over keeps what was recorded as a voicemail, sends neither push, and the call goes on as
-an answered one, its `answeredAt` still the machine's pickup. `peer` is `""` for a withheld number.
+`transcript` is `null` when nothing was transcribed). Call audio failing while the machine
+records ends the recording there: the backend keeps what came before and hangs up.
+
+A recording becomes a voicemail (`voicemails` event, `voicemail` push) only when it holds a
+message: sound above the line's own noise, or, where it was transcribed, words. Anything else — a
+recording under a second, or silence however long — is no message: nothing of it is kept, and the
+call ends as a missed one, its record `missed` with `answeredAt` and `durationS` `null` and `seen`
+`false`, with a `missed-call` push ("Missed call · no message left"). A take-over keeps what was
+recorded as a voicemail if it holds a message, sends neither push, and the call goes on as an
+answered one, its `answeredAt` still the machine's pickup. `peer` is `""` for a withheld number.
 When the call ends while the machine records, `call` (`null`) and `calls` come first and the
 `voicemail` with `recording: false`, then `voicemails`, after.
 
@@ -799,7 +806,10 @@ nobody answered; `declined` if it ended unanswered within 15 seconds of a client
 call, except the one that answered, declined, or sent it to the machine (with `screen`, within
 the same 15 seconds). Any `ack` —
 `foreground` or `background` — means that client took its call screen down; one that does not
-answer within 1.5 seconds, or has no live socket, gets the VoIP "end" push.
+answer within 1.5 seconds, or has no live socket, gets the VoIP "end" push. A client whose system
+never showed the call (Focus held it back) may send that `ack` before it is asked, as soon as it
+knows; it is then neither asked nor pushed when the ringing stops — an end push would have to be
+reported as a call again, and Focus lets a second call from the same number through.
 
 An `ack` is the only JSON a client sends.
 
@@ -842,7 +852,7 @@ clients are asked nothing and pushed nothing.
 | It ends | `call` (`null`), `calls` rev; if missed `badge` | missed only: `missed` (5 s) | missed only: alert `missed-call`, `call-<id>` | — |
 | The machine records | `voicemail` (no rev) | — | — | — |
 | A voicemail is saved | `voicemails` rev, `badge` | `voicemail` (5 s) | alert `voicemail`, `call-<id>` (`voicemail-<id>` without a record) | none; not sent at all when a client took the call over |
-| The machine got under a second | `calls` rev, `badge` | `missed` (5 s) | alert `missed-call`, `call-<id>` | — |
+| The machine got no message | `calls` rev, `badge` | `missed` (5 s) | alert `missed-call`, `call-<id>` | — |
 | An alert is raised | `security` rev (with `alert`), `badge` | `alert` (5 s) | alert `security`, `alert-<id>` | — |
 | Checks' findings change, an alert is acknowledged | `security` rev | — | — | — |
 | A setting changes (`PATCH /v1/settings`) | `features` rev per `voicemail`/`transcription` object, `status` if `ownNumber`, then `rev` | — | — | — |
@@ -855,7 +865,7 @@ clients are asked nothing and pushed nothing.
 Within a row the events go in the order listed, every socket getting them in that order; `notify`
 frames follow the events, and pushes follow the answers to them. A call the answering machine took
 ends in two rows: *It ends* (`call` `null`, `calls`), then *A voicemail is saved* or *The machine got
-under a second*. A take-over sends `call` (the new holder) and `calls` (`answered`) before the
+no message*. A take-over sends `call` (the new holder) and `calls` (`answered`) before the
 machine's `voicemail` with `recording: false`.
 
 ## Push (feature `push`)
@@ -920,7 +930,7 @@ app routes a tap by them and by the field names:
 | --- | --- | --- | --- | --- | --- | --- |
 | A message | `sms` | the peer's name or number / the text, cut to 240 characters with `…` | `peer`, `messageId` | `sms-<id>` | `active` | `default` |
 | A ringing call, to a client without a VoIP token | `call` | "Incoming call" / the caller (name, number, or "No caller ID") | `number` (`null` if withheld), `callId` | `call-<id>` | `time-sensitive` | `ringtone.caf` |
-| A missed call | `missed-call` | the caller / "Missed call" ("Missed call · no message left" when the machine took it and got nothing) | `number`, `callId` | `call-<id>` | `active` | `default` |
+| A missed call | `missed-call` | the caller / "Missed call" ("Missed call · no message left" when the machine took it and got no message) | `number`, `callId` | `call-<id>` | `active` | `default` |
 | A voicemail | `voicemail` | the caller / e.g. "Missed call · voicemail 18 sec" | `voicemailId`, `number`, `callId` | `call-<id>` (`voicemail-<id>` without a record) | `active` | `default` |
 | A security alert | `security` | "Security alert: " + its title / the first line of its detail | `alertId` | `alert-<id>` | `time-sensitive` | `default` |
 

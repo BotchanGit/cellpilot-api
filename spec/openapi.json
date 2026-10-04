@@ -2679,7 +2679,7 @@
               "voicemail",
               "in-progress"
             ],
-            "description": "in-progress until connected; answered while connected (never final); completed once a connected call ends; voicemail when the answering machine took it (a call taken over from it becomes answered, then completed); missed for an incoming call never connected; busy / no-answer / failed for an outgoing one; rejected optional (declined). See the specification, *The history*."
+            "description": "in-progress until connected; answered while connected (never final); completed once a connected call ends; voicemail when the answering machine took it and kept a message (a call taken over from it becomes answered, then completed); missed for an incoming call never connected, or taken by the machine without a message; busy / no-answer / failed for an outgoing one; rejected optional (declined). See the specification, *The history*."
           },
           "durationS": {
             "type": [

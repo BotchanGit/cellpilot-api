@@ -290,13 +290,13 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | `in-progress` | 还没接通。 |
 | `answered` | 接通了、还在通话；不会是最终值。 |
 | `completed` | 接通过、已结束，不论谁挂断。 |
-| `voicemail` | 答录机接的。客户端从答录机手里接过来的（`claim`，或录音中 `answer`）改为 `answered`，结束为 `completed`。 |
-| `missed` | 来电，一直没接通：对方放弃、被拒接、无人接听。`seen` 变为 `false`。 |
+| `voicemail` | 答录机接了并留下了留言。客户端从答录机手里接过来的（`claim`，或录音中 `answer`）改为 `answered`，结束为 `completed`。 |
+| `missed` | 来电，一直没接通：对方放弃、被拒接、无人接听——或者答录机接了但没有留言（见“答录机”）。`seen` 变为 `false`。 |
 | `busy`、`no-answer` | 去电，模块报对方忙或无人接听；分辨不出的后端记为 `failed`。 |
 | `failed` | 去电因其他原因没接通，包括接通前自己挂断；网络给了原因时 `endReason` 说明。 |
 | `rejected` | 来电被拒接。可选：`cellpilotd` 把拒接记为 `missed`；App 把 `rejected` 显示为已拒接。 |
 
-后端重启或设备断开时仍未结束的记录在那一刻收尾：没接通的（`in-progress`）为 `failed`；`answered` 为 `completed`，结束时间为那一刻，时长算到那一刻；`voicemail` 仍是 `voicemail`，结束时间为那一刻。`endReason` 只在 `failed` 时有值。隐藏号码的 `peer` 为 `""`。App 把 `answered` 和 `completed` 显示得一样，把 `missed` 和 `voicemail` 算作未接，`in-progress` 显示为进行中。
+后端重启或设备断开时仍未结束的记录在那一刻收尾：没接通的（`in-progress`）为 `failed`；`answered` 为 `completed`，结束时间为那一刻，时长算到那一刻；`voicemail` 如果答录机留下了留言，仍是 `voicemail`，结束时间为那一刻；没有留言则为 `missed`（`answeredAt` 和 `durationS` 为 `null`）——被重启打断的录音会丢失。`endReason` 只在 `failed` 时有值。隐藏号码的 `peer` 为 `""`。App 把 `answered` 和 `completed` 显示得一样，把 `missed` 和 `voicemail` 算作未接，`in-progress` 显示为进行中。
 
 `calls` 事件（最新一页，条数由后端定——`cellpilotd` 是 50）在记录结束、被看过、被删除、联系人改名时发；通话开始和接通时不发，那由 `call` 事件负责。有 `places` 特性时带 `place`/`carrier`；`seen` 对还没有人打开过的未接来电（或答录机接了但录到不足 1 秒的来电）为 `false`；其他记录一开始就是 `seen: true`——去电、接通的，以及有留言的答录（它通过留言的 `heard` 计数）。`POST /v1/calls/{id}/seen` 把它标为所有客户端都已看——已经看过也回 `200`，没有这条记录回 `404 not_found`——`seen` 真的变了才发 `calls`；App 只对 `seen: false` 的记录调用，失败就忽略。`DELETE /v1/calls/{id}` 没有这条记录回 `404 not_found`；进行中的通话的记录也可以删，那通电话结束后就没有记录。
 
@@ -349,7 +349,9 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 ## 答录机（特性 `voicemail`）
 
-响铃 `settings.voicemail.answerAfterS` 秒没人接的来电（`reason: "no-answer"`；开关关着时不接），或客户端用 `screen` 交过来的来电（`reason: "declined"`），由答录机接起。这时通话为 `active`、`holder: null`，记录为 `voicemail`。开始录音时发 `{ "type": "voicemail", "recording": true, "peer", "reason", "transcript": "" }`；有转写时每识别出一段再发一次，`transcript` 是到目前为止的全文，`delta` 是新增部分。对方挂断、录满 `maxSeconds`（后端挂断）、或客户端接过去时结束，发 `recording: false` 和最终的 `transcript`（事件里没有转写为 `""`，从不为 `null`；保存下来的留言什么都没转写出来时 `transcript` 为 `null`）。录音满 1 秒——按长度算，不管有没有说话——就成为一条留言（`voicemails` 事件、`voicemail` 推送）；不满 1 秒不建留言，记录的 `seen` 变为 `false`，改推 `missed-call`。被接过去时已录的部分照样保存为留言，两种推送都不发，通话按已接通继续，`answeredAt` 仍是答录机接起的时刻。隐藏号码的 `peer` 为 `""`。答录机录音中通话结束时，先发 `call`（`null`）和 `calls`，之后才发 `recording: false` 的 `voicemail`，再发 `voicemails`。
+响铃 `settings.voicemail.answerAfterS` 秒没人接的来电（`reason: "no-answer"`；开关关着时不接），或客户端用 `screen` 交过来的来电（`reason: "declined"`），由答录机接起。只有通话音频在流动时它才接；没有音频（音频通路没能启动）时后端直接挂断，这通电话算未接。接起后通话为 `active`、`holder: null`，记录为 `voicemail`。开始录音时发 `{ "type": "voicemail", "recording": true, "peer", "reason", "transcript": "" }`；有转写时每识别出一段再发一次，`transcript` 是到目前为止的全文，`delta` 是新增部分。对方挂断、录满 `maxSeconds`（后端挂断）、或客户端接过去时结束，发 `recording: false` 和最终的 `transcript`（事件里没有转写为 `""`，从不为 `null`；保存下来的留言什么都没转写出来时 `transcript` 为 `null`）。录音过程中通话音频故障，录音就在那里结束：后端保留之前录到的部分，然后挂断。
+
+录音只有含有留言内容时才成为一条留言（`voicemails` 事件、`voicemail` 推送）：有高于线路本底噪声的声音，或者转写出了文字（有转写时）。其他情况——不满 1 秒，或者不论多长都是静音——都不算留言：录音一点不保留，这通电话按未接结束，记录为 `missed`，`answeredAt` 和 `durationS` 为 `null`，`seen` 为 `false`，并推送 `missed-call`（"未接来电 · 未留言"）。被接过去时，已录的部分含有留言内容才保存为留言，两种推送都不发，通话按已接通继续，`answeredAt` 仍是答录机接起的时刻。隐藏号码的 `peer` 为 `""`。答录机录音中通话结束时，先发 `call`（`null`）和 `calls`，之后才发 `recording: false` 的 `voicemail`，再发 `voicemails`。
 
 `GET /v1/voicemails` 列出最新的（`cellpilotd` 最多 200 条），`?peer=` 精确匹配。第一次取录音（`GET /v1/voicemails/{id}/audio`，`audio/wav`）时标为已听并发 `voicemails`。`POST /v1/voicemails/{id}/transcribe`（`language`：`auto`、`zh`、`yue`、`en`、`ja`、`ko`）只要声明了 `transcription` 就能用，与开关无关；同一时间只转一条（`409`）；返回 `{ "transcript", "language" }`，`language` 是请求的语言，并把留言的 `transcriptLanguage` 设为它（包括 `auto`）——实时转写的为 `null`。
 
@@ -422,7 +424,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 `foreground` 表示 App 在前台、已自己显示，不再推送。`background`，或 5 秒内（来电 1.5 秒）没有回复，该客户端就会收到推送。没有存活连接的客户端不问；没有推送 token 的照样问，只是之后没东西可推。`id` 是 `call-<id>`、`sms-<id>`、`alert-<id>`（没有通话记录的留言为 `voicemail-<id>`），与推送的 collapse id 相同，客户端不管从哪条路收到都只显示一次。`kind` 是 `call`（响铃中的来电，只发给没有 VoIP token 的客户端——有的直接收 VoIP 推送——带 `callId`）、`missed`、`voicemail`、`sms`、`alert`，或 `call-end`。
 
-**停止响铃。** 来电离开 `incoming` 时：某个客户端接了，`reason` 为 `answered`；答录机接了（包括 `screen`）、对方放弃或无人接听，为 `unanswered`；没接通就结束、且在某个客户端 `hangup` 之后 15 秒内，为 `declined`。`call-end`（带 `callId` 和 `reason`）发给收到过这通电话 VoIP 推送的每个客户端，除了接听的、拒接的、或把它交给答录机的那个（用 `screen`，同样在 15 秒内）。任何 `ack`——`foreground` 或 `background`——都表示那个客户端已经收起了来电界面；1.5 秒内没有回复、或没有存活连接的，收一条 VoIP“结束”推送。
+**停止响铃。** 来电离开 `incoming` 时：某个客户端接了，`reason` 为 `answered`；答录机接了（包括 `screen`）、对方放弃或无人接听，为 `unanswered`；没接通就结束、且在某个客户端 `hangup` 之后 15 秒内，为 `declined`。`call-end`（带 `callId` 和 `reason`）发给收到过这通电话 VoIP 推送的每个客户端，除了接听的、拒接的、或把它交给答录机的那个（用 `screen`，同样在 15 秒内）。任何 `ack`——`foreground` 或 `background`——都表示那个客户端已经收起了来电界面；1.5 秒内没有回复、或没有存活连接的，收一条 VoIP“结束”推送。系统根本没有显示这通来电的客户端（被专注模式拦下），可以不等问就提前发这个 `ack`；这样响铃结束时既不问它，也不给它推送——结束推送到了手机还得再上报一次来电，而专注模式会放行同一号码的第二次来电。
 
 `ack` 是客户端唯一会发的 JSON。
 
@@ -452,7 +454,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | 结束 | `call`（`null`）、`calls` rev；未接时 `badge` | 仅未接：`missed`（5 秒） | 仅未接：alert `missed-call`，`call-<id>` | — |
 | 答录机录音中 | `voicemail`（不推进 rev） | — | — | — |
 | 留言保存 | `voicemails` rev、`badge` | `voicemail`（5 秒） | alert `voicemail`，`call-<id>`（没有记录时 `voicemail-<id>`） | 无；客户端接过通话时根本不发 |
-| 答录机录到不足 1 秒 | `calls` rev、`badge` | `missed`（5 秒） | alert `missed-call`，`call-<id>` | — |
+| 答录机没有录到留言 | `calls` rev、`badge` | `missed`（5 秒） | alert `missed-call`，`call-<id>` | — |
 | 产生告警 | `security` rev（带 `alert`）、`badge` | `alert`（5 秒） | alert `security`，`alert-<id>` | — |
 | 检查结果变化、确认告警 | `security` rev | — | — | — |
 | 设置变化（`PATCH /v1/settings`） | 每个 `voicemail`/`transcription` 对象一个 `features` rev，有 `ownNumber` 时 `status`，然后 `rev` | — | — | — |
@@ -462,7 +464,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | 设备状态变化 | `status` | — | — | — |
 | 某个客户端的记录或端点变化 | `client`，只发给那个客户端 | — | — | — |
 
-同一行里的事件按列出的顺序发，每个连接收到的顺序都一样；`notify` 帧在事件之后，推送在对它们的回复之后。答录机接的电话结束时分两行：先是“结束”（`call` `null`、`calls`），然后是“留言保存”或“答录机录到不足 1 秒”。接管时先发 `call`（新的 holder）和 `calls`（`answered`），再发答录机的 `recording: false` 的 `voicemail`。
+同一行里的事件按列出的顺序发，每个连接收到的顺序都一样；`notify` 帧在事件之后，推送在对它们的回复之后。答录机接的电话结束时分两行：先是“结束”（`call` `null`、`calls`），然后是“留言保存”或“答录机没有录到留言”。接管时先发 `call`（新的 holder）和 `calls`（`answered`），再发答录机的 `recording: false` 的 `voicemail`。
 
 ## 推送（特性 `push`）
 
@@ -500,7 +502,7 @@ key = HKDF-SHA256(ikm = SHA-256(token), salt = "cellpilot", info = "push-v1", le
 | --- | --- | --- | --- | --- | --- | --- |
 | 短信 | `sms` | 对方的名字或号码 / 正文，超过 240 个字符截断加 `…` | `peer`、`messageId` | `sms-<id>` | `active` | `default` |
 | 来电，发给没有 VoIP token 的客户端 | `call` | “来电” / 来电者（名字、号码或“无来电显示”） | `number`（隐藏为 `null`）、`callId` | `call-<id>` | `time-sensitive` | `ringtone.caf` |
-| 未接来电 | `missed-call` | 来电者 / “未接来电”（答录机接了却什么都没录到：“未接来电 · 未留言”） | `number`、`callId` | `call-<id>` | `active` | `default` |
+| 未接来电 | `missed-call` | 来电者 / “未接来电”（答录机接了但没有留言：“未接来电 · 未留言”） | `number`、`callId` | `call-<id>` | `active` | `default` |
 | 留言 | `voicemail` | 来电者 / 如“未接来电 · 有留言 18 秒” | `voicemailId`、`number`、`callId` | `call-<id>`（没有记录时 `voicemail-<id>`） | `active` | `default` |
 | 安全告警 | `security` | “安全告警：”加告警标题 / 详情第一行 | `alertId` | `alert-<id>` | `time-sensitive` | `default` |
 

@@ -1107,7 +1107,7 @@ components:
         outcome:
           type: string
           enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress]
-          description: "接通前 in-progress；通话中 answered（不会是最终值）；接通过的通话结束为 completed；答录机接的为 voicemail（从它手里接过来的改为 answered，结束为 completed）；没接通的来电为 missed；去电为 busy / no-answer / failed；rejected 可选（拒接）。见规范“通话记录”。"
+          description: "接通前 in-progress；通话中 answered（不会是最终值）；接通过的通话结束为 completed；答录机接了并留下留言的为 voicemail（从它手里接过来的改为 answered，结束为 completed）；没接通的来电、或答录机接了但没有留言的为 missed；去电为 busy / no-answer / failed；rejected 可选（拒接）。见规范“通话记录”。"
         durationS: { type: [integer, "null"], description: "从接通（答录机接的从它接起）到结束；没接通或没结束为 null。" }
         endReason: { type: [string, "null"], description: "failed 时的原因，使用读者的语言；其他为 null。" }
         place: { type: [string, "null"], description: "有 `places` 特性时提供。" }
