@@ -7,9 +7,14 @@ used in its place. The app does not care what the backend is, where it runs, or 
 Where this document says what `cellpilotd` does, it describes the reference backend's choice
 within the rules, which the app is tested against.
 
-The API is the whole contract. Calls and messages need no CellPilot account and pass through no
-server of ours, and the app does nothing that is not in this document. The one
-service CellPilot operates, the push relay, is optional and built not to read what it carries (see *Push*).
+The API is the whole contract between the app and a backend: toward the backend, the app uses
+only what this document describes. Calls and messages need no CellPilot account; they travel
+directly between the app and the backend, and no server of ours carries them. The one service
+CellPilot operates, the push relay, is optional. With push on, a notification about a new message,
+call or voicemail passes through the relay end-to-end encrypted, which the relay is designed to be
+unable to decrypt (see *Push*). Separately from the backend, the app talks to the relay for
+sign-in, push-token binding, enrolment grants and — if the user turns on Share Usage Data —
+diagnostics, as the [privacy policy](../docs/privacy.html) describes.
 
 **This file is the specification.** [openapi.yaml](openapi.yaml) defines the routes and shapes
 ([openapi.json](openapi.json) is the same, generated for tools; [openapi.zh-CN.yaml](openapi.zh-CN.yaml)
@@ -18,13 +23,41 @@ The backend guide, in English and Chinese, is a readable companion derived from 
 adds no rules of its own. Where any of them disagrees with this file, this file wins. This file covers what OpenAPI cannot: the event stream, the audio frames, pairing, push,
 the relay, and what a backend must implement.
 
+## Intended use and limits
+
+CellPilot is for one person using their own SIM card from their own devices: a line they hold,
+reached from their own iPhones. The design keeps to that:
+
+- One backend drives one device with one SIM.
+- A message goes to one recipient, and is sent because the user sent it.
+- There is no way to set the calling number: a call leaves with the number the network gives the
+  SIM.
+- The relay enrols a backend under one person's Apple account and delivers its pushes only to that
+  account's phones.
+- With `security`, the backend alerts the user to signs that the device has been tampered with;
+  which checks it runs (a replaced SIM or module, say) is the backend's choice.
+
+A backend must not add bulk sending, automated dialling, changes to the caller ID, or SIM
+rotation. Use of CellPilot is subject to the [acceptable use policy](../ACCEPTABLE_USE.md).
+
+CellPilot is not a replacement for phone service and must not be relied on for emergency calls:
+a call depends on the Internet connection, the backend, the module and the carrier, and an
+emergency call leaves from the module's location, so it may reach the wrong emergency centre,
+which sees the wrong location. Use a regular phone.
+
+CellPilot is made only for lawful purposes. We abide by the law and do not endorse, support or
+assist any unlawful activity. If you find a problem — misuse, or anything in the product or this
+document that conflicts with laws or regulations — please tell us right away at
+abuse@cellpilot.dev. We will cooperate with the authorities and rectify it, and if necessary
+change, restrict or shut down the feature or service concerned.
+
 ## Terms
 
 | Term | Meaning |
 | --- | --- |
 | **device** | The cellular hardware the backend controls: the module and its SIM. One backend, one device. |
 | **backend** | The program implementing this API. `cellpilotd` is one; yours may be another. |
-| **client** | One installation of the CellPilot app, known to the backend by a token. |
+| **client** | One installation of the CellPilot app, known to the backend by a token. Clients are the SIM holder's own devices; the API is not designed for sharing a line among several people. |
 | **endpoint** | One way to reach the backend: a base URL plus optional headers. A backend may have several. |
 | **peer** | The other party's phone number, as the network delivered it or the user typed it, less grouping (see *Numbers*). |
 
@@ -101,7 +134,7 @@ pairing screen.
 
 ## Compatibility
 
-Version 1 of this API only grows. Within it:
+We intend version 1 of this API only to grow. Within it:
 
 - Nothing documented here is removed or changes meaning, and no field changes type.
 - New things arrive as new optional fields, new event types, or new features a backend declares.
@@ -114,6 +147,10 @@ Version 1 of this API only grows. Within it:
 
 A change that cannot keep these promises would be version 2, with its own base path (`/v2`), and
 the app would keep speaking v1 to backends that have not moved.
+
+We may still change or withdraw something when security, law, Apple's platform rules or the
+relay's operation require it; such changes are announced in the changelog (`CHANGELOG.md`).
+Nothing here is a warranty of continued compatibility or availability.
 
 ## Discovery and features
 
@@ -232,6 +269,8 @@ Whatever carries the connection, two things must get through it:
 
 A path that needs an interactive login in a browser cannot be used by the app, and neither can
 one that needs software of its own on the phone besides a VPN app (frp's `stcp`/`xtcp`).
+"VPN" here means a private network back to your own home network, not a service for reaching
+sites blocked where you are; follow the laws on network access where you live.
 
 The app connects through the best endpoint that answers, by priority: endpoints better than the
 one in use keep trying to open the event stream, so the app moves up as soon as a better path
@@ -310,7 +349,7 @@ Rules a backend must keep:
   ever, so a block cannot lock out the phones behind a shared proxy address. Every `429` —
   the event stream's upgrade refusal included — carries `Retry-After`, the seconds the block has left.
 - A backend may refuse `POST /v1/pair` on some listeners. `cellpilotd` accepts it on the local
-  network only, so its six-digit code is never exposed to the Internet.
+  network only, so it does not accept pairing from the Internet.
 
 ### What the app does with it
 
@@ -375,7 +414,7 @@ unknown), `registration` and `updatedAt` are always there; anything unknown is `
 audio at all; `audio.active` that it is exchanging frames with the holder now. A backend with no
 call audio reports `ready: false` and never sends `audio`; calls still connect, and the app says
 there is no sound. `security` is present only with the `security` feature. `home` is the SIM's
-home — the country that issued it (ISO 3166-1 alpha-2), from the IMSI's country code (MCC), or
+home — the country or region that issued it (ISO 3166-1 alpha-2), from the IMSI's country code (MCC), or
 without one from the country code of an own number entered by hand with `+` — and the area code
 its own number belongs to (`null` when the backend cannot place the number), as
 dialled nationally: with the trunk prefix where the country writes it as part of the code (a `0`:
@@ -502,7 +541,7 @@ or the device goes away becomes `failed`.
 and deletes it for good without — `200` also for a peer with no messages; the history of calls with
 the peer is left alone. `DELETE /v1/messages/{id}` deletes one message for good, trash or no
 trash (one already in the trash too); `POST /v1/messages/{id}/trash`, with `trash`, moves one into
-the trash (the app uses it for verification codes it has already used). Either is `404` for no
+the trash (the app uses it to put away single messages the user no longer needs). Either is `404` for no
 such message, and the latter also for one already in the trash.
 
 A long incoming message is one record from its first part: each part sends a `message` event —
@@ -575,7 +614,7 @@ it, less its grouping: the digits, a leading `+`, and the `*` and `#` of a USSD 
 dashes, dots and brackets go. Nothing is ever added — no country code, no area code — and that
 holds for the device's own number too, read from the SIM or typed. A value with no digit at all
 (`"anonymous"`, a withheld caller) is no number: `""` — except an SMS sender, which can be a name
-(`CMBCHINA`): that is kept as it came, trimmed, and is a conversation of its own (matched exactly;
+(`EXAMPLECO`): that is kept as it came, trimmed, and is a conversation of its own (matched exactly;
 the matching rule never joins it to anything). `Message.peer`, `Conversation.peer`,
 `CallRecord.peer`, `Voicemail.peer`, `Call.number`, a contact's `numbers` and `ownNumber` are all
 stored forms. `dial`'s `number` and `send`'s `to` are stripped of grouping before their checks, and
@@ -654,6 +693,12 @@ recorded as a voicemail if it holds a message, sends neither push, and the call 
 answered one, its `answeredAt` still the machine's pickup. `peer` is `""` for a withheld number.
 When the call ends while the machine records, `call` (`null`) and `calls` come first and the
 `voicemail` with `recording: false`, then `voicemails`, after.
+
+**Recording and consent.** Recording a caller, transcribing the recording and letting the user
+follow it live may, depending on where the caller and the user are, require telling the caller or
+getting their consent. A backend should play a greeting saying that the call is answered by a
+machine and recorded. Complying with local law is the responsibility of whoever runs the backend.
+Recordings and transcripts stay on the backend.
 
 `GET /v1/voicemails` lists the newest (up to 200 in `cellpilotd`), `?peer=` matching exactly.
 Fetching a recording (`GET /v1/voicemails/{id}/audio`, `audio/wav`) the first time marks it
@@ -809,7 +854,8 @@ the same 15 seconds). Any `ack` —
 answer within 1.5 seconds, or has no live socket, gets the VoIP "end" push. A client whose system
 never showed the call (Focus held it back) may send that `ack` before it is asked, as soon as it
 knows; it is then neither asked nor pushed when the ringing stops — an end push would have to be
-reported as a call again, and Focus lets a second call from the same number through.
+reported as a call again, and, when Repeated Calls is on (the default), Focus lets a second call
+from the same number through.
 
 An `ack` is the only JSON a client sends.
 
@@ -873,11 +919,14 @@ machine's `voicemail` with `recording: false`.
 The app cannot be woken by the backend directly; Apple Push Notification service (APNs) does
 that, and only the holder of the app's APNs key can send through it. CellPilot operates a relay
 for backends: `https://push.cellpilot.dev`, whose two routes a backend uses are defined below
-(*The relay*). The relay is built not to see a number or a message: every push a conforming
-backend sends is sealed for the one app that will open it, and the relay refuses anything in the
-clear but a bare badge count (it checks the shape, not the wording of the 40 characters in the
-clear). It does see what delivery needs: the APNs token, the account, the backend's id and label,
-and when each push is sent. Which happening pushes what is in
+(*The relay*). The relay is built not to see a number or a message. When the backend follows this
+specification, every push it sends is sealed for the one app that will open it, so that neither
+the relay nor Apple can read its contents; they still see delivery metadata — when a push is
+sent, to which device, and what kind of notification it is. The relay refuses any push without a
+sealed payload except a bare badge count; the few fields Apple needs in the clear — the generic
+alert (`CellPilot` and a body of up to 40 characters), the category and the badge — stay readable.
+Backends must keep the clear text generic. The relay also sees what delivery needs: the APNs
+token, the account, the backend's id and label, and when each push is sent. Which happening pushes what is in
 *From a happening to events and pushes*.
 
 ### Registration
@@ -957,7 +1006,8 @@ number is known (or after two seconds without one, a withheld number). It has ex
 when withheld, `name` the contact's display name or `null`, `place` always an object, each
 language `null` when unknown (both, without `places`). It
 must only ever be sent for a call that is actually ringing — iOS makes the app report a call for
-every VoIP push — and the relay sends it so it is never delivered late. A client sent one gets no
+every VoIP push — and the relay sends it with an expiry of 0, so Apple tries to deliver it at
+once and drops it rather than deliver it late; delivery is not guaranteed. A client sent one gets no
 `call` alert and no `notify` for that call. When the call stops ringing, a client that did not
 acknowledge `call-end` (see *Presence and `notify`*) gets one more, sealing
 `{ "type": "end", "callId", "reason" }`; the app reports it and ends it at once. Without `type`
@@ -1046,7 +1096,8 @@ The texts are matched loosely: a `402` whose `error` contains `suspended` is `su
 
 Only pushes the relay actually sends on to Apple count against the account's hourly and daily
 limits, whose values the relay's answers give; a refused one — for any reason, the quota and the hourly limit included —
-costs nothing. **`not-enrolled`** means the relay no longer knows the backend's key, which
+costs nothing. Limits, quotas and how they are counted are set by the relay and may change;
+values in examples are illustrative. **`not-enrolled`** means the relay no longer knows the backend's key, which
 nothing on the backend's side can mend: the backend lets its enrolment go, so `GET /v1/push`
 reports `mode: "none"`, `relay: null`, `problem: { "code": "not-enrolled", … }`, and the next app
 that refreshes enrols it again — with the same key, which gets the same `daemonId` back.
@@ -1097,7 +1148,8 @@ later, no dependencies).
 **`tools/api-check.mjs`** checks a running backend against the core and whatever features it
 declares, every response and event frame field by field against `openapi.json` and
 `events.schema.json`. By default it only reads: it never dials, answers, sends a message or
-changes a setting, so it is safe against a backend with a real SIM. The rest is for a backend
+changes a setting: it is designed not to change anything, so it can be run against a backend with
+a real SIM. The rest is for a backend
 with a simulated device only, and `--dial`, `--sim` and `--code` each go with `--write`:
 
 | Option | Adds |

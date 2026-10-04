@@ -3,8 +3,8 @@
  * Checks a running backend against the CellPilot Device API (spec/): the core, and each
  * feature the backend declares. Every response and every event frame it sees is checked against
  * spec/openapi.json and spec/events.schema.json, field by field. Read-only by default: it
- * never dials, answers, hangs up, sends a message, marks anything read or changes a setting, so it
- * is safe against a real SIM.
+ * never dials, answers, hangs up, sends a message, marks anything read or changes a setting: it is
+ * designed not to change anything, so it can be run against a backend with a real SIM.
  *
  *   node tools/api-check.mjs --url http://192.168.1.10:9400 --token <client token>
  *        [--header "CF-Access-Client-Id: …"]… [--lang en|zh] [--json] [--schemas <dir>]

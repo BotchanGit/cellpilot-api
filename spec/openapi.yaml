@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: CellPilot Device API
   version: "1"
-  license: { name: MIT }
+  license: { name: MIT, identifier: MIT }
   description: |
     The contract between the CellPilot app and a backend that controls a cellular device.
     device-api.md next to this file is the specification and wins on any disagreement; it covers the
@@ -1059,7 +1059,7 @@ components:
           description: "The SIM's home: what every number is read in (the specification, *Numbers*)."
           required: [country, areaCode]
           properties:
-            country: { type: [string, "null"], description: "ISO 3166-1 alpha-2 of the country that issued the SIM, from the IMSI, or without one from the country code of the own number entered by hand; null when neither tells." }
+            country: { type: [string, "null"], description: "ISO 3166-1 alpha-2 of the country or region that issued the SIM, from the IMSI, or without one from the country code of the own number entered by hand; null when neither tells." }
             areaCode: { type: [string, "null"], description: "The area code of the place the SIM's own number belongs to, as dialled nationally: with the trunk prefix where the country writes it (\"0571\", \"010\"), without where it does not (\"212\"). Reads a local landline of the SIM's own area; never added to a number. Null when it cannot be told." }
         location:
           type: object
@@ -1136,7 +1136,7 @@ components:
       properties:
         id: { type: integer }
         direction: { type: string, enum: [in, out] }
-        peer: { type: string, description: 'The stored form; an SMS sender with no digits (a name such as CMBCHINA) is kept as it came, trimmed.' }
+        peer: { type: string, description: 'The stored form; an SMS sender with no digits (a name such as EXAMPLECO) is kept as it came, trimmed.' }
         body: { type: string }
         status: { type: string, enum: [pending, sent, failed, received] }
         createdAt: { type: string, format: date-time }

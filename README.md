@@ -21,6 +21,8 @@
 
 ---
 
+> Use CellPilot only lawfully — see [Legal](#legal).
+
 CellPilot is an iPhone app that turns a cellular module with a SIM card — a 4G module on a Mac,
 a modem on a home server — into a phone line you carry in your pocket: calls with two-way audio,
 SMS, an answering machine, contacts, and push notifications when the app is closed.
@@ -30,8 +32,10 @@ module that exposes it over HTTP and a WebSocket. This repository is everything 
 one — the specification, machine-readable schemas, a guide with an example for every route, and
 tools that check a backend without the app.
 
-No server of ours is in the path of a call or a message. The one service CellPilot runs, the
-[push relay](#push-relay), is optional and built not to read what it carries.
+Calls and messages travel directly between the app and the backend; no server of ours carries
+them. The one service CellPilot runs, the [push relay](#push-relay), is optional: with push on, a
+notification about a new message, call or voicemail passes through it end-to-end encrypted, which
+the relay is designed to be unable to decrypt.
 
 ## How it fits together
 
@@ -51,8 +55,10 @@ flowchart LR
 
 The app pairs with the backend once, then reaches it through whatever endpoints the backend
 lists: a LAN address, a Tailscale name, a Cloudflare Tunnel, a reverse proxy. Calls and messages
-travel between the two directly. Pushes are sealed with a key only the app and the backend hold,
-so the relay forwards them without being able to read them.
+travel between the two directly. Pushes are sealed with a key only the app and the backend hold:
+when the backend follows the specification, the relay forwards them without being able to read
+their contents, and neither can Apple; both still see delivery metadata — when a push is sent, to
+which device, and what kind of notification it is.
 
 ## What is in this repository
 
@@ -67,6 +73,8 @@ so the relay forwards them without being able to read them.
 | [`tools/mock-backend.mjs`](tools/mock-backend.mjs) | The smallest backend the app works with, in one file. |
 | [`tools/test-relay.mjs`](tools/test-relay.mjs) | A local stand-in for the push relay. |
 | [`fixtures/number-rules.json`](fixtures/number-rules.json) | How phone numbers are stored, read and shown, as a table of cases. |
+| [`ACCEPTABLE_USE.md`](ACCEPTABLE_USE.md) | What CellPilot may and may not be used for. |
+| [`NOTICE.md`](NOTICE.md) | Trademarks, third-party data and encryption. |
 
 The tools need Node.js 22 or later and nothing else. The guide is plain HTML: open
 `docs/index.html` in a browser.
@@ -98,7 +106,8 @@ address (`http://<your computer's LAN address>:8799`) and enter the code it prin
 2. **Start from something that works.** Read `tools/mock-backend.mjs`, or adapt a project you
    already have. Build against a simulated device first: the simulation hooks
    (`POST /_sim/sms`, `/_sim/call`, …) let the checker make things happen.
-3. **Check it.** `tools/api-check.mjs` is read-only by default and safe against a real SIM.
+3. **Check it.** `tools/api-check.mjs` is read-only by default: it is designed not to change
+   anything, so it can be run against a backend with a real SIM.
    With a simulated device, `--write --dial --sim --code` exercises sending, calling, arrivals,
    notify and acknowledgements, audio, and re-pairing.
 4. **Add features as you can honestly offer them.** A backend declares what it supports in
@@ -135,16 +144,23 @@ The core is required. Everything else is optional and declared by the backend.
 
 The app cannot be woken by a backend directly; Apple only accepts pushes from the holder of the
 app's key. CellPilot runs a relay at `https://push.cellpilot.dev` that forwards pushes for
-enrolled backends. Every push is sealed with a key derived from the client's token, so the relay
-cannot read what a conforming backend sends, and it refuses anything sent in the clear but a bare badge count. A backend is enrolled
-from the app, under the user's Sign in with Apple identity, and can reach only that user's
-phones. The protocol, signatures and test vectors are in the specification under *Push*.
+enrolled backends; it is currently invitation-only. Every push from a backend that follows the
+specification is sealed with a key derived from the client's token, so the relay cannot read its
+contents. The relay refuses any push without a sealed payload except a bare badge count; the few
+fields Apple needs in the clear — a generic alert text of up to 40 characters, the category and
+the badge — stay readable. A backend is enrolled from the app, under the user's Sign in with
+Apple identity, and can reach only that user's phones. Limits, quotas and how they are counted
+are set by the relay and may change. The protocol, signatures and test vectors are in the
+specification under *Push*.
 
 ## Compatibility
 
-Version 1 only grows. Nothing documented is removed or changes meaning; new things arrive as
-optional fields, new event types and new features. Clients ignore what they do not know, and so
-do backends. A change that cannot keep this promise would be version 2, on its own base path.
+We intend version 1 only to grow. Nothing documented is removed or changes meaning; new things
+arrive as optional fields, new event types and new features. Clients ignore what they do not
+know, and so do backends. A change that cannot keep this would be version 2, on its own base path.
+We may still change or withdraw something when security, law, Apple's platform rules or the
+relay's operation require it; such changes are announced in [CHANGELOG.md](CHANGELOG.md). Nothing
+here is a warranty of continued compatibility or availability.
 
 ## Reference backend
 
@@ -158,6 +174,39 @@ rules, not a requirement.
 Questions, unclear passages and mistakes in the specification are welcome as issues; see
 [CONTRIBUTING.md](CONTRIBUTING.md). Security problems — in the protocol, the relay or the tools —
 go through [SECURITY.md](SECURITY.md), not public issues.
+
+## Legal
+
+**Lawful use only.** CellPilot is made only for lawful purposes. We abide by the law and do not
+endorse, support or assist any unlawful activity. If you find a problem — misuse, or anything in
+the product or these documents that conflicts with laws or regulations — please tell us right
+away at abuse@cellpilot.dev. We will cooperate with the authorities and rectify it, and if
+necessary change, restrict or shut down the feature or service concerned. Use of CellPilot is
+subject to the [acceptable use policy](ACCEPTABLE_USE.md): your own SIM, from your own devices;
+no fraud, bulk or automated calls or messages, caller-ID changes, SIM pools or code-receiving
+services.
+
+**Not for emergencies.** CellPilot is not a replacement for phone service. A call depends on your
+Internet connection, your backend, the module and the carrier, and an emergency call leaves from
+the module's location, so it may reach the wrong emergency centre, which sees the wrong location.
+In an emergency, use a regular phone.
+
+**Recording.** The answering machine, call screening and transcription record and transcribe
+callers. Depending on where the caller and the user are, the law may require telling the caller
+or getting their consent; whoever runs the backend is responsible for complying.
+
+**No warranty.** The specification, guide, schemas and tools are provided "as is", without
+warranty of any kind, as the [license](LICENSE) states. The push relay is a separate service: it
+is currently invitation-only, offered on terms given to invitees, and it may change, be limited
+or end.
+
+**Trademarks.** Apple, iPhone and the other product and company names in this repository belong
+to their owners and are named only to describe compatibility or give examples; CellPilot is not
+affiliated with, endorsed or sponsored by them. See [NOTICE.md](NOTICE.md), which also covers
+third-party data and encryption.
+
+**Reporting.** Misuse, or anything in CellPilot or these documents that conflicts with laws or
+regulations: abuse@cellpilot.dev. Security vulnerabilities: [SECURITY.md](SECURITY.md).
 
 ## License
 

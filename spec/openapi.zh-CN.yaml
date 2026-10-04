@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: CellPilot 设备 API
   version: "1"
-  license: { name: MIT }
+  license: { name: MIT, identifier: MIT }
   description: |
     CellPilot App 与控制蜂窝设备的后端之间的契约。旁边的 device-api.md（中文版 device-api.zh-CN.md）是规范，
     不一致时以它为准；它讲 OpenAPI 描述不了的部分：事件流、音频帧、配对、推送和中转，events.schema.json 定义每个事件帧。标有 `x-feature` 的路由只在后端于 `GET /v1` 中声明了
@@ -919,7 +919,7 @@ components:
           properties:
             p12: { type: string, contentEncoding: base64 }
             password: { type: string }
-        vpn: { type: string, description: '手机要连着哪个 VPN 才能到这个端点（"Tailscale"），端点连不上时 App 会提示。' }
+        vpn: { type: string, description: '手机要连着哪个虚拟组网（VPN）才能到这个端点（"Tailscale"），端点连不上时 App 会提示。' }
 
     ClientConfig:
       type: object
@@ -1056,14 +1056,14 @@ components:
           description: SIM 卡的归属：每个号码都在它里面读（规范「号码」一节）。
           required: [country, areaCode]
           properties:
-            country: { type: [string, "null"], description: "SIM 卡发行国的 ISO 3166-1 两位码，取自 IMSI，没有时取手填本机号码的国家码；都说不了时为 null。" }
-            areaCode: { type: [string, "null"], description: "本机号码所属的区号，按国内拨号写法：国家把长途前缀写进区号的带上（\"0571\"、\"010\"），不写的不带（\"212\"）。用来认出 SIM 本地的固话；从不加到号码上。无法得知时为 null。" }
+            country: { type: [string, "null"], description: "SIM 卡发行国家或地区的 ISO 3166-1 两位码，取自 IMSI，没有时取手填本机号码的国家码；都说不了时为 null。" }
+            areaCode: { type: [string, "null"], description: "本机号码所属的区号，按国内拨号写法：这个国家或地区把长途前缀写进区号的带上（\"0571\"、\"010\"），不写的不带（\"212\"）。用来认出 SIM 本地的固话；从不加到号码上。无法得知时为 null。" }
         location:
           type: object
           description: 设备所在地。只用于显示，和读号码无关。
           required: [country]
           properties:
-            country: { type: [string, "null"], description: "设备当前注册网络所属国家的 ISO 3166-1 两位码；没注册且 SIM 也说不了时为 null。" }
+            country: { type: [string, "null"], description: "设备当前注册网络所属国家或地区的 ISO 3166-1 两位码；没注册且 SIM 也说不了时为 null。" }
         updatedAt: { type: string, format: date-time }
 
     Call:
@@ -1133,7 +1133,7 @@ components:
       properties:
         id: { type: integer }
         direction: { type: string, enum: [in, out] }
-        peer: { type: string, description: '保存形式；没有数字的短信发件人（如 CMBCHINA 这样的名字）按来时的样子保存，去掉首尾空白。' }
+        peer: { type: string, description: '保存形式；没有数字的短信发件人（如 EXAMPLECO 这样的名字）按来时的样子保存，去掉首尾空白。' }
         body: { type: string }
         status: { type: string, enum: [pending, sent, failed, received] }
         createdAt: { type: string, format: date-time }

@@ -18,6 +18,9 @@
  *   hangup               POST /_sim/hangup                the far end hangs up
  *   answer               POST /_sim/answer                the far end answers the outgoing call now
  * Outgoing calls are otherwise answered after 2 s.
+ * For testing only. It listens on every interface by default (--host 0.0.0.0) so a phone on the
+ * LAN can reach it; it is not hardened, so do not expose it to the Internet or any network
+ * you do not trust (--host 127.0.0.1 keeps it on this machine).
  * Node >= 22, no dependencies: the WebSocket for GET /v1/events is done by hand (RFC 6455).
  */
 
@@ -58,6 +61,7 @@ if (!Number.isInteger(opt.history) || opt.history < 0 || opt.history > 5000) usa
 function usage(problem) {
   if (problem) console.error(problem);
   console.error('usage: node tools/mock-backend.mjs [--port 8799] [--host 0.0.0.0] [--incoming] [--code 123456] [--history 250] [--token-header] [--tls <dir>] [--mtls <dir>]');
+  console.error('For testing only: do not expose it to the Internet or any untrusted network (--host 127.0.0.1 keeps it local).');
   process.exit(problem ? 2 : 0);
 }
 

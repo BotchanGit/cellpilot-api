@@ -28,9 +28,28 @@ TOKEN=$(curl -s -X POST http://127.0.0.1:8799/v1/pair -d '{"code":"123456"}' \
 node tools/api-check.mjs --url http://127.0.0.1:8799 --token "$TOKEN" --write --to +15555550101 --dial --sim --code 123456
 ```
 
+## Licensing of contributions
+
+By sending a contribution — a pull request, a patch, a case or text in an issue — you agree that
+it is licensed under this repository's [MIT License](LICENSE), and you confirm that you have the
+right to submit it. Do not include real phone numbers, tokens, keys, message content or other
+personal data: use the example numbers already in the repository (such as `+15555550101`) and
+made-up content.
+
+Contributions that would facilitate unlawful use — bulk sending, automated dialling, changing the
+caller ID, SIM pools or rotation, receiving verification codes for others — will not be accepted.
+See [ACCEPTABLE_USE.md](ACCEPTABLE_USE.md).
+
+### 贡献的许可
+
+提交贡献——pull request、补丁、issue 中的用例或文字——即表示你同意它按本仓库的 [MIT 许可证](LICENSE) 授权，并确认你有权提交它。
+请不要包含真实的电话号码、token、密钥、短信内容或其他个人数据：请使用仓库中已有的示例号码（如 `+15555550101`）和编造的内容。
+
+会便利违法使用的贡献——群发、自动拨号、更改主叫号码、SIM 卡池或轮换、替他人接收验证码——不会被接受。见 [ACCEPTABLE_USE.md](ACCEPTABLE_USE.md)。
+
 ## Compatibility
 
-Version 1 only grows. A proposal that removes something, changes a field's type or meaning, or
+We intend version 1 only to grow. A proposal that removes something, changes a field's type or meaning, or
 makes something optional required belongs to a future version.
 
 ## Conduct

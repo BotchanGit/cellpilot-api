@@ -4,7 +4,8 @@
     "title": "CellPilot Device API",
     "version": "1",
     "license": {
-      "name": "MIT"
+      "name": "MIT",
+      "identifier": "MIT"
     },
     "description": "The contract between the CellPilot app and a backend that controls a cellular device.\ndevice-api.md next to this file is the specification and wins on any disagreement; it covers the\nevent stream, audio frames, pairing, push and the relay, which OpenAPI cannot describe, and\nevents.schema.json defines every event frame. Routes marked `x-feature` exist only when the backend lists that\nfeature in `GET /v1`. Routes marked `x-optional` are core routes a backend may leave out\n(answering 404); the app does without them.\n"
   },
@@ -2466,7 +2467,7 @@
                   "string",
                   "null"
                 ],
-                "description": "ISO 3166-1 alpha-2 of the country that issued the SIM, from the IMSI, or without one from the country code of the own number entered by hand; null when neither tells."
+                "description": "ISO 3166-1 alpha-2 of the country or region that issued the SIM, from the IMSI, or without one from the country code of the own number entered by hand; null when neither tells."
               },
               "areaCode": {
                 "type": [
@@ -2798,7 +2799,7 @@
           },
           "peer": {
             "type": "string",
-            "description": "The stored form; an SMS sender with no digits (a name such as CMBCHINA) is kept as it came, trimmed."
+            "description": "The stored form; an SMS sender with no digits (a name such as EXAMPLECO) is kept as it came, trimmed."
           },
           "body": {
             "type": "string"

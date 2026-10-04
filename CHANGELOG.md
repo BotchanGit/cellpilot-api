@@ -1,6 +1,6 @@
 # Changelog
 
-The API is versioned by its base path (`/v1`). Within a version it only grows: entries add fields,
+The API is versioned by its base path (`/v1`). Within a version it is intended only to grow: entries add fields,
 events, features or clarifications. An entry marked **Changed rule** tightens what a backend should
 do; the app keeps working with a backend that follows the earlier text, and the entry says what to
 change. Tools are versioned with the repository.
@@ -38,6 +38,32 @@ change. Tools are versioned with the repository.
 ### Docs
 
 - The backend guide (English and Chinese) and the Chinese specification follow both changes.
+
+### Legal and acceptable use
+
+No API behaviour changes.
+
+- Added [`ACCEPTABLE_USE.md`](ACCEPTABLE_USE.md) (what CellPilot may and may not be used for,
+  emergency calls, recording, reporting) and [`NOTICE.md`](NOTICE.md) (trademarks, third-party
+  data, encryption).
+- The READMEs have a **Legal** section: lawful use only, not for emergencies, recording consent,
+  no warranty, trademarks, where to report problems.
+- The specification has a section *Intended use and limits*: one person, their own SIM, their own
+  devices, and what a backend must not add. The answering machine has a note on recording and
+  consent; the guide follows.
+- The privacy policy now lists in full what the relay sees to deliver a notification, and adds
+  copies kept by iOS, where data is processed, your rights, requests from authorities and that
+  the relay is currently invitation-only.
+- Corrected statements about what passes through the relay: calls and messages do not; with push
+  on, notifications do, sealed, and the relay and Apple still see delivery metadata. VoIP pushes
+  are sent with expiry 0, so they are dropped rather than delivered late; delivery is not
+  guaranteed. The compatibility promise is stated as an intention, and relay limits may change.
+- Wording: "country or region"; in Chinese, "一致性检查" for conformance checks and "国家或地区".
+- The owner's statement: CellPilot is made only for lawful purposes; we abide by the law and do
+  not endorse, support or assist any unlawful activity. Tell us right away at
+  abuse@cellpilot.dev if you find misuse, or anything that conflicts with laws or regulations; we
+  will cooperate with the authorities and rectify it, and if necessary change, restrict or shut
+  down the feature or service concerned.
 
 ## 2026-10-03
 
@@ -86,6 +112,21 @@ First public release of the CellPilot Device API v1.
 
 - 后端指南（中英文）和中文规范都已同步以上两项。
 
+**法律声明与合法使用**
+
+API 行为没有变化。
+
+- 新增 [`ACCEPTABLE_USE.md`](ACCEPTABLE_USE.md)（CellPilot 可以和不可以用来做什么、紧急呼叫、录音、举报）和
+  [`NOTICE.md`](NOTICE.md)（商标、第三方数据、加密）。
+- 两份 README 增加了**法律声明**一节：仅限合法用途、不能用于紧急呼叫、录音须知、不提供担保、商标、问题报告渠道。
+- 规范新增"预期用途与限制"一节：一个人、自己的 SIM 卡、自己的设备，以及后端不得加入的功能。答录机一节增加了录音与同意的说明；指南同步。
+- 隐私政策完整列出了中转为投递通知能看到的信息，并新增 iOS 保存的副本、数据在哪里处理、你的权利、有关部门的要求，以及中转目前仅限受邀使用。
+- 更正了关于什么经过中转的表述：通话和短信不经过；开启推送时，通知经过中转，内容是封装的，中转和 Apple 仍能看到投递元数据。
+  VoIP 推送以过期时间 0 发送，送不到就丢弃而不会延迟送达；不保证一定送达。兼容性承诺改为意向表述，中转限额可能变化。
+- 用词：一致性检查、符合本规范的后端；号码和 SIM 卡归属写作"国家或地区"。
+- 所有者声明：CellPilot 仅为合法用途而制作；我们遵守法律法规，不认可、不支持、也不协助任何违法活动。发现滥用或任何与法律法规相抵触的内容，
+  请立即通过 abuse@cellpilot.dev 告诉我们；我们会配合有关部门并予以整改，必要时变更、限制或关闭相关功能或服务。
+
 ### 2026-10-03
 
 - 新增 CellPilot App 和推送中转的隐私政策（`docs/privacy.html`）。
@@ -93,4 +134,4 @@ First public release of the CellPilot Device API v1.
 ### 2026-10-02
 
 CellPilot 设备 API v1 首次公开发布：规范（英文为准，附中文版）、OpenAPI 3.1 描述、事件流 JSON Schema、中英文后端指南、
-合规检查工具 `api-check`、最小后端 `mock-backend`、本地推送中转 `test-relay`，以及号码规则用例表。
+一致性检查工具 `api-check`、最小后端 `mock-backend`、本地推送中转 `test-relay`，以及号码规则用例表。
