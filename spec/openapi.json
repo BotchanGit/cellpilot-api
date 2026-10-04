@@ -202,6 +202,16 @@
           "401": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "description": "`conflict`: the backend already has as many phones paired as it allows (`details.limit`). The code stays good; unpair one and try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "429": {
             "$ref": "#/components/responses/Error"
           }
@@ -596,6 +606,16 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "description": "`outbound_limited`: refused by the outbound limits (see the specification, *Outbound limits*). `details` carries `rule`, `limit` and `retryAt`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -989,6 +1009,16 @@
           },
           "400": {
             "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "description": "`outbound_limited`: refused by the outbound limits (see the specification, *Outbound limits*). `details` carries `rule`, `limit` and `retryAt`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -1825,6 +1855,7 @@
                   "conflict",
                   "signed_out",
                   "rate_limited",
+                  "outbound_limited",
                   "device_unavailable",
                   "internal",
                   "upstream_failed"
@@ -1842,6 +1873,36 @@
                   "field": {
                     "type": "string",
                     "description": "The field that was wrong; nested fields joined with dots (\"voicemail.answerAfterS\")."
+                  },
+                  "rule": {
+                    "type": "string",
+                    "enum": [
+                      "stranger-calls",
+                      "hotline-calls",
+                      "calls-per-day",
+                      "call-gap",
+                      "stranger-texts",
+                      "link-to-stranger",
+                      "same-text",
+                      "texts-per-day",
+                      "locked"
+                    ],
+                    "description": "`outbound_limited`: which outbound limit refused it."
+                  },
+                  "limit": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "The limit reached: an outbound limit (`outbound_limited`), or the paired-phone limit (`POST /v1/pair`); null when the rule has no number."
+                  },
+                  "retryAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "`outbound_limited`: when the same request would be allowed again; null when it never will (a link to a stranger)."
                   }
                 }
               }

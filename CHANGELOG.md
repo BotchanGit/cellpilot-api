@@ -9,6 +9,27 @@ change. Tools are versioned with the repository.
 
 ## 2026-10-04
 
+### Added — outbound limits; what CellPilot is for
+
+- **What CellPilot is for**, now stated the same way everywhere: so that people whose iPhone takes
+  only eSIM do not miss the texts and calls of a physical SIM card of their own. It is made mainly
+  for receiving; calling and texting are for the occasional need, and a number used every day
+  belongs in a phone or on an eSIM.
+- **Outbound limits** (new section in the specification). The app now limits calls and texts:
+  within 24 hours, calls to 3 and texts to 3 distinct numbers that are not contacts and have not
+  contacted the line, calls to 10 hotlines, 20 calls and 30 texts in all, 30 seconds between
+  calls, no links except to familiar numbers, one text to at most 2 numbers; two refusals pause
+  outbound to unfamiliar numbers for 24 hours. Emergency numbers are never limited.
+  *What to change:* a backend should apply the same limits to `POST /v1/call/dial` and
+  `POST /v1/messages` and refuse with the new error code `429 outbound_limited`, whose `details`
+  carry `rule`, `limit` and `retryAt`. A backend without them still works; the app's own limits
+  apply either way.
+- **Paired phones.** A backend may limit how many phones are paired at once and refuse a new one
+  with `409 conflict` and `details.limit`, without spending the code. The reference backend allows
+  three.
+- The acceptable use policy, the READMEs, OpenAPI (`Error.code`, `Error.details`, the `429` of
+  `dial` and `sendMessage`, the `409` of `pair`) and the guide follow.
+
 ### Changed rule — answering machine (backends with the `voicemail` feature)
 
 - **A voicemail is a message kept.** A recording becomes a voicemail only when it holds a message:
@@ -88,6 +109,18 @@ First public release of the CellPilot Device API v1.
 ## 中文
 
 ### 2026-10-04
+
+**新增：外发限制；CellPilot 的用途**
+
+- **CellPilot 的用途**，各处统一表述为：让只能使用 eSIM 的 iPhone 用户，不错过自己另一张实体 SIM 卡上的短信和来电。
+  它以接收为主；拨号和发短信只为偶尔的需要提供，日常使用的号码应当放进手机或转为 eSIM。
+- **外发限制**（规范新增一节）。App 现在会限制拨号和短信：24 小时内，最多拨打 3 个、发短信给 3 个不在通讯录也没有联系过这条线路的号码，
+  拨打 10 个热线，全部通话 20 通、短信 30 条，两次拨号间隔 30 秒，带链接的短信只能发给熟悉的号码，同一条短信最多发给 2 个号码；
+  被拒绝两次会暂停对陌生号码的外发 24 小时。紧急号码不受限制。
+  *需要改的：* 后端应当对 `POST /v1/call/dial` 和 `POST /v1/messages` 执行同样的限制，并用新的错误码 `429 outbound_limited` 拒绝，
+  `details` 带 `rule`、`limit` 和 `retryAt`。不执行的后端照样能用；App 自己的限制始终有效。
+- **配对手机数。** 后端可以限制同时配对的手机数，用 `409 conflict` 加 `details.limit` 拒绝新手机，不消耗配对码。参考后端允许三台。
+- 合法使用条款、两份 README、OpenAPI（`Error.code`、`Error.details`、`dial` 和 `sendMessage` 的 `429`、`pair` 的 `409`）和指南已同步。
 
 **规则变更：答录机（声明了 `voicemail` 特性的后端）**
 

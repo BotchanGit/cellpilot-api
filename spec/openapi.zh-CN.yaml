@@ -95,6 +95,9 @@ paths:
           description: "请求不对：code 缺失或不是字符串，或请求体不是 JSON 对象。"
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "401": { $ref: "#/components/responses/Error" }
+        "409":
+          description: "`conflict`：后端已配对它允许的最多手机数（`details.limit`）。配对码仍然有效，取消配对一台后可以再试。"
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "429": { $ref: "#/components/responses/Error" }
 
   /client:
@@ -283,6 +286,9 @@ paths:
         "503": { $ref: "#/components/responses/Error" }
         "400": { $ref: "#/components/responses/Error" }
         "500": { $ref: "#/components/responses/Error" }
+        "429":
+          description: "`outbound_limited`：被外发限制拒绝（见规范“外发限制”）。`details` 写明 `rule`、`limit` 和 `retryAt`。"
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
   /call/answer:
     post:
       operationId: answer
@@ -463,6 +469,9 @@ paths:
                 properties: { message: { $ref: "#/components/schemas/Message" } }
         "503": { $ref: "#/components/responses/Error" }
         "400": { $ref: "#/components/responses/Error" }
+        "429":
+          description: "`outbound_limited`：被外发限制拒绝（见规范“外发限制”）。`details` 写明 `rule`、`limit` 和 `retryAt`。"
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
   /messages/search:
     get:
       operationId: searchMessages
@@ -860,7 +869,7 @@ components:
           properties:
             code:
               type: string
-              enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, device_unavailable, internal, upstream_failed]
+              enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, outbound_limited, device_unavailable, internal, upstream_failed]
               description: "upstream_failed（502）只来自 POST /v1/push/enrol：中转拒绝或没有回答。"
             message: { type: string, description: "给人看的文字，使用读者的语言。" }
             details:
@@ -868,6 +877,9 @@ components:
               additionalProperties: true
               properties:
                 field: { type: string, description: '出错的字段；嵌套字段用点连接（"voicemail.answerAfterS"）。' }
+                rule: { type: string, enum: [stranger-calls, hotline-calls, calls-per-day, call-gap, stranger-texts, link-to-stranger, same-text, texts-per-day, locked], description: "`outbound_limited`：拒绝的是哪条外发限制。" }
+                limit: { type: [integer, "null"], description: "达到的上限：外发限制（`outbound_limited`），或配对手机数上限（`POST /v1/pair`）；规则没有数字上限时为 null。" }
+                retryAt: { type: [string, "null"], format: date-time, description: "`outbound_limited`：同样的请求何时可以再次通过；永远不会通过时（发给陌生号码的链接）为 null。" }
 
     Discovery:
       type: object

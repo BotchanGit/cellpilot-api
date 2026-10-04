@@ -8,14 +8,16 @@ then in Chinese.
 
 ## Purpose · 宗旨
 
-CellPilot lets one person use their own SIM card, in a cellular module they control, from their
-own iPhone. It is made only for lawful purposes. We abide by the law and do not endorse, support
+CellPilot is designed so that people whose iPhone takes only eSIM do not miss the texts and calls
+of a physical SIM card of their own, in a cellular module they control. It is made mainly for
+receiving: calling and texting are there for the occasional need and are strictly limited, and a
+number used every day belongs in a phone or on an eSIM. It is made only for lawful purposes. We abide by the law and do not endorse, support
 or assist any unlawful activity. If you find a problem — misuse of CellPilot, or anything in the
 product or these documents that conflicts with laws or regulations — please tell us right away at
 **abuse@cellpilot.dev**. We will cooperate with the authorities and rectify it, and if necessary
 change, restrict or shut down the feature or service concerned.
 
-CellPilot 让一个人在自己的 iPhone 上，使用插在自己掌控的蜂窝模块里的自己的 SIM 卡。它仅为合法用途而制作。我们遵守法律法规，不认可、不支持、也不协助任何违法活动。如果你发现问题——CellPilot 被滥用，或产品、本文档中有任何与法律法规相抵触的内容——请立即通过 **abuse@cellpilot.dev** 告诉我们。我们会配合有关部门并予以整改，必要时变更、限制或关闭相关功能或服务。
+CellPilot 的设计初衷，是让只能使用 eSIM 的 iPhone 用户，不错过插在自己掌控的蜂窝模块里、自己另一张实体 SIM 卡上的短信和来电。它以接收为主：拨号和发短信只是为偶尔的必要情况提供的便利，有严格的次数限制；日常使用的号码应当放进手机或转为 eSIM。它仅为合法用途而制作。我们遵守法律法规，不认可、不支持、也不协助任何违法活动。如果你发现问题——CellPilot 被滥用，或产品、本文档中有任何与法律法规相抵触的内容——请立即通过 **abuse@cellpilot.dev** 告诉我们。我们会配合有关部门并予以整改，必要时变更、限制或关闭相关功能或服务。
 
 ## You may · 你可以
 
@@ -45,6 +47,8 @@ You must not:
 - Evade or test carriers' risk controls, or circumvent network management.
 - Use cellular modules that lack the type approval or network-access licence required where you
   use them.
+- Circumvent the limits on calls and texts, in the app or in a backend, or build a backend
+  without them to get around them.
 
 你不得：
 
@@ -56,6 +60,7 @@ You must not:
 - 一个后端使用多张 SIM 卡、轮换 SIM 卡，或搭建 SIM 卡池或模块池。
 - 规避或试探运营商的风控措施，或绕过网络管理。
 - 使用在使用地未取得所需型号核准或进网许可的蜂窝模块。
+- 规避 App 或后端中对拨号和短信的次数限制，或为绕过这些限制而编写不带限制的后端。
 
 ## Your responsibility · 你的责任
 

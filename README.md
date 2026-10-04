@@ -23,9 +23,12 @@
 
 > Use CellPilot only lawfully — see [Legal](#legal).
 
-CellPilot is an iPhone app that turns a cellular module with a SIM card — a 4G module on a Mac,
-a modem on a home server — into a phone line you carry in your pocket: calls with two-way audio,
-SMS, an answering machine, contacts, and push notifications when the app is closed.
+CellPilot is an iPhone app designed so that people whose iPhone takes only eSIM do not miss the
+texts and calls of a physical SIM card of their own. The card sits in a cellular module — a 4G
+module on a Mac, a modem on a home server — and CellPilot brings its texts, calls, voicemail and
+notifications to the iPhone, even when the app is closed. It is made mainly for receiving:
+calling and texting are there for the occasional need and are strictly limited. A number you use
+every day belongs in your phone, or on an eSIM.
 
 The app does not talk to the module. It talks to a **backend**: a program you run next to the
 module that exposes it over HTTP and a WebSocket. This repository is everything needed to write
@@ -185,6 +188,11 @@ necessary change, restrict or shut down the feature or service concerned. Use of
 subject to the [acceptable use policy](ACCEPTABLE_USE.md): your own SIM, from your own devices;
 no fraud, bulk or automated calls or messages, caller-ID changes, SIM pools or code-receiving
 services.
+
+**Made for receiving.** Calls and texts are limited to what one person needs now and then: each
+day, calls to 3 and texts to 3 numbers that are not contacts and have not contacted you, no links
+to such numbers, 20 calls and 30 texts in all. The app enforces this, and a backend should too
+(see *Outbound limits* in the [specification](spec/device-api.md)).
 
 **Not for emergencies.** CellPilot is not a replacement for phone service. A call depends on your
 Internet connection, your backend, the module and the carrier, and an emergency call leaves from

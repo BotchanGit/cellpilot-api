@@ -98,6 +98,9 @@ paths:
           description: "Bad request: the code is missing or not a string, or the body is not a JSON object."
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "401": { $ref: "#/components/responses/Error" }
+        "409":
+          description: "`conflict`: the backend already has as many phones paired as it allows (`details.limit`). The code stays good; unpair one and try again."
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
         "429": { $ref: "#/components/responses/Error" }
 
   /client:
@@ -286,6 +289,9 @@ paths:
         "503": { $ref: "#/components/responses/Error" }
         "400": { $ref: "#/components/responses/Error" }
         "500": { $ref: "#/components/responses/Error" }
+        "429":
+          description: "`outbound_limited`: refused by the outbound limits (see the specification, *Outbound limits*). `details` carries `rule`, `limit` and `retryAt`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
   /call/answer:
     post:
       operationId: answer
@@ -466,6 +472,9 @@ paths:
                 properties: { message: { $ref: "#/components/schemas/Message" } }
         "503": { $ref: "#/components/responses/Error" }
         "400": { $ref: "#/components/responses/Error" }
+        "429":
+          description: "`outbound_limited`: refused by the outbound limits (see the specification, *Outbound limits*). `details` carries `rule`, `limit` and `retryAt`."
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
   /messages/search:
     get:
       operationId: searchMessages
@@ -863,7 +872,7 @@ components:
           properties:
             code:
               type: string
-              enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, device_unavailable, internal, upstream_failed]
+              enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, outbound_limited, device_unavailable, internal, upstream_failed]
               description: "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer."
             message: { type: string, description: "For people, in the reader's language." }
             details:
@@ -871,6 +880,9 @@ components:
               additionalProperties: true
               properties:
                 field: { type: string, description: 'The field that was wrong; nested fields joined with dots ("voicemail.answerAfterS").' }
+                rule: { type: string, enum: [stranger-calls, hotline-calls, calls-per-day, call-gap, stranger-texts, link-to-stranger, same-text, texts-per-day, locked], description: "`outbound_limited`: which outbound limit refused it." }
+                limit: { type: [integer, "null"], description: "The limit reached: an outbound limit (`outbound_limited`), or the paired-phone limit (`POST /v1/pair`); null when the rule has no number." }
+                retryAt: { type: [string, "null"], format: date-time, description: "`outbound_limited`: when the same request would be allowed again; null when it never will (a link to a stranger)." }
 
     Discovery:
       type: object

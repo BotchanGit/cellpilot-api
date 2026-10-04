@@ -25,11 +25,16 @@ the relay, and what a backend must implement.
 
 ## Intended use and limits
 
-CellPilot is for one person using their own SIM card from their own devices: a line they hold,
-reached from their own iPhones. The design keeps to that:
+CellPilot is designed so that people whose iPhone takes only eSIM do not miss the texts and calls
+of a physical SIM card of their own: one person, their own SIM, registered in their own name,
+reached from their own iPhones. It is made mainly for receiving. Calling and texting are there for
+the occasional need and are strictly limited (see *Outbound limits*); a number used every day
+belongs in a phone, or on an eSIM. The design keeps to that:
 
-- One backend drives one device with one SIM.
+- One backend drives one device with one SIM, and serves a few phones of one person
+  (`cellpilotd`: at most three paired at once).
 - A message goes to one recipient, and is sent because the user sent it.
+- Calls and texts are limited to what one person needs now and then.
 - There is no way to set the calling number: a call leaves with the number the network gives the
   SIM.
 - The relay enrols a backend under one person's Apple account and delivers its pushes only to that
@@ -39,6 +44,40 @@ reached from their own iPhones. The design keeps to that:
 
 A backend must not add bulk sending, automated dialling, changes to the caller ID, or SIM
 rotation. Use of CellPilot is subject to the [acceptable use policy](../ACCEPTABLE_USE.md).
+
+### Outbound limits
+
+The app limits what the user can call and text, whatever the backend; a backend should apply the
+same limits to `POST /v1/call/dial` and `POST /v1/messages`, so the API used directly is held to
+them too. `cellpilotd` does. A number is one of four kinds, judged at the moment of sending:
+
+| Kind | What it is |
+| --- | --- |
+| emergency | `110`, `112`, `119`, `120`, `122`, `911`, `999`, `000`, `995`, without `+`. Never limited. |
+| familiar | A contact, or a number that has called or texted this line (*Contacts* matching rule). |
+| hotline | A short code (3–6 digits), a toll-free, shared-cost or premium number, or a gateway sender (*Numbers*). |
+| stranger | Anything else. |
+
+Within any 24 hours:
+
+| Rule (`details.rule`) | Limit |
+| --- | --- |
+| `stranger-calls` | Calls to 3 distinct strangers. Calling one of them again is not another. |
+| `hotline-calls` | Calls to 10 distinct hotlines. |
+| `calls-per-day` | 20 calls, familiar numbers included. |
+| `call-gap` | 30 seconds between two calls. |
+| `stranger-texts` | Texts to 3 distinct strangers. |
+| `link-to-stranger` | No text containing a link to anyone but a familiar number. |
+| `same-text` | One text to at most 2 distinct numbers. Texts are compared with case, spaces, punctuation and digits removed; under 8 characters left, they are not compared. |
+| `texts-per-day` | 30 texts. |
+| `locked` | Two refusals by any rule but `call-gap` within 24 hours pause calls and texts to anyone but familiar and emergency numbers for 24 hours from the second. |
+
+The same number written two ways (*Contacts* matching rule) is one number. Only what was let
+through counts; the record of it is kept apart from the messages and calls, so deleting a
+conversation does not reset it. A refusal answers `429 outbound_limited` before anything is
+recorded or sent, with `details`: `rule`, `limit` (`null` for `link-to-stranger` and `locked`),
+and `retryAt`, when the same request would go (`null` when it never will). The app explains the
+refusal in the user's language from these fields; the message is for logs.
 
 CellPilot is not a replacement for phone service and must not be relied on for emergency calls:
 a call depends on the Internet connection, the backend, the module and the carrier, and an
@@ -103,6 +142,7 @@ change, restrict or shut down the feature or service concerned.
   | 410 | `signed_out` | The client was unpaired or revoked. The app forgets its token and shows the pairing screen. |
   | 413 | `invalid_request` | The body is larger than the backend takes. |
   | 429 | `rate_limited` | Too many failed attempts from this source. `Retry-After` (seconds) is set. |
+  | 429 | `outbound_limited` | `dial` or `send` refused by the outbound limits (*Outbound limits*); `details` says which rule and until when. |
   | 500 | `internal` | Anything else, the module refusing a command included (see *The call*). |
   | 502 | `upstream_failed` | `POST /v1/push/enrol` only: the relay refused the enrolment or could not be reached. |
   | 503 | `device_unavailable` | The device is not attached or not ready. |
@@ -348,6 +388,10 @@ Rules a backend must keep:
   A token that works, the right pairing code, and a revoked token (still `410`) are answered as
   ever, so a block cannot lock out the phones behind a shared proxy address. Every `429` —
   the event stream's upgrade refusal included — carries `Retry-After`, the seconds the block has left.
+- A backend may limit how many phones are paired at once. A new phone over the limit is
+  `409 conflict` with `details.limit`, checked after the code and without spending it, so one can
+  be unpaired and the same code tried again; the same `uid` pairing again is never refused for
+  it. `cellpilotd` allows three.
 - A backend may refuse `POST /v1/pair` on some listeners. `cellpilotd` accepts it on the local
   network only, so it does not accept pairing from the Internet.
 
@@ -449,8 +493,8 @@ device's `503` where it is listed first:
 
 - `POST /v1/call/dial` `{ "number" }`: grouping is stripped (*Numbers*), then it must be 1–32 of
   `0-9*#` with an optional leading `+` (`400`, `"number"`); any call at all, a ringing one
-  included, is `409`; no device, `503`. The number goes to the network as typed; the dialling
-  client becomes the holder.
+  included, is `409`; no device, `503`; over an outbound limit, `429 outbound_limited`. The
+  number goes to the network as typed; the dialling client becomes the holder.
 - `POST /v1/call/answer`: answers the ringing call; the answering client becomes the holder.
   While the answering machine has the call it works as `claim`. Neither (no device included):
   `409`.
@@ -530,7 +574,8 @@ unread count — `200` also for a peer with nothing unread or no messages.
 
 `POST /v1/messages` (`{ "to", "text" }`) sends. `to` is stripped of grouping and must then be 3–20
 digits with an optional leading `+` (`400`, `"to"`); `text` is any non-empty string, split into
-parts by the backend as needed (`400`, `"text"`); then no device is `503`, and nothing is recorded. It
+parts by the backend as needed (`400`, `"text"`); then no device is `503`, and over an outbound
+limit `429 outbound_limited` (*Outbound limits*); either way nothing is recorded. It
 answers `{ "message": { … } }`: the message, `direction: "out"`, `read: true`, in state `pending` —
 or, if the backend waits for the module, already `sent` or `failed` (`cellpilotd` waits); the app
 takes either. Events: `message` when it is recorded (`pending`), `message` again when it is sent
