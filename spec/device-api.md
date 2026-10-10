@@ -55,7 +55,7 @@ one of four kinds, judged at the moment of sending:
 | Kind | What it is |
 | --- | --- |
 | emergency | `110`, `112`, `119`, `120`, `122`, `911`, `999`, `000`, `995`, without `+`. Never limited. |
-| familiar | A contact, or a number that has called or texted this line (*Contacts* matching rule), known for at least **3 days**: since the contact was made or the first call or text from it. The app counts from when it first saw the number, and lets at most 5 numbers become familiar a day. |
+| familiar | A contact, or a number that has called or texted this line (*Contacts* matching rule), known for at least **3 days**: since the contact was made or the first call or text from it, and never from before the backend first applied these rules: a number known before then waits its 3 days from that day. The app counts from when it first saw the number — for an app updated into these rules, from the update, contacts included — and lets at most 5 numbers become familiar a day. |
 | hotline | A short code (3–6 digits), a toll-free, shared-cost or premium number, or a gateway sender (*Numbers*). |
 | stranger | Anything else. |
 

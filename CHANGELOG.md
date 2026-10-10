@@ -17,8 +17,9 @@ updated table in the specification (*Outbound limits*); new `details.rule` value
 with `429 outbound_limited`.
 
 - **Familiar** now takes three days: since the contact was made or the number first called or
-  texted. The app counts from when it first saw the number and lets at most 5 numbers become
-  familiar a day.
+  texted, and never from before the rules first applied, so numbers known before then (contacts
+  included) wait their three days too. The app counts from when it first saw the number, and lets
+  at most 5 numbers become familiar a day.
 - **Totals**: 10 calls (was 20) and 20 texts (was 30) a day.
 - **New rules**: `call-burst` and `text-burst` (at most 3 different numbers within 15 minutes for
   calls, 10 for texts), `short-calls` (3 calls in a row to different numbers, each over within 15
@@ -184,7 +185,7 @@ First public release of the CellPilot Device API v1.
 
 限制更严格了，而且 App 现在只依据它自己看到的情况判断，后端怎么说都放宽不了。*需要改的：* 执行外发限制的后端，按规范里更新后的表格（“外发限制”）调整；`429 outbound_limited` 可能带回新的 `details.rule` 值。
 
-- **熟悉的号码**现在要满三天：从建立联系人或第一次来电、来短信算起。App 从它自己第一次看到这个号码算起，每天最多让 5 个号码变成熟悉的号码。
+- **熟悉的号码**现在要满三天：从建立联系人或第一次来电、来短信算起，但不早于规则开始应用的那一天，所以在那之前就认识的号码（包括联系人）也要等满三天。App 从它自己第一次看到这个号码算起，每天最多让 5 个号码变成熟悉的号码。
 - **总量**：每天 10 通电话（原来 20）、20 条短信（原来 30）。
 - **新增规则**：`call-burst` 和 `text-burst`（15 分钟内最多拨打、10 分钟内最多发短信给 3 个不同号码）、`short-calls`（连续 3 通打给不同号码且每通都不到 15 秒，暂停拨号 30 分钟）、`code-relay`（最近 10 分钟收到的验证码不能转发）、`code-flood`（一天内收到 10 个以上不同发送方的验证码，暂停一切外发）、`sim-changed`（换卡后 24 小时内不能联系不熟悉的号码）和 `forbidden-code`（不能拨打设置呼叫转移或隐藏主叫号码的代码）。
 - **锁定**：距上一次锁定不到一周又被锁定的，锁 7 天。
