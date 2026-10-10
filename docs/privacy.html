@@ -28,7 +28,7 @@
 
 <section id="en" lang="en">
 <h1>CellPilot Privacy Policy</h1>
-<p class="meta">Effective 4 October 2026</p>
+<p class="meta">Effective 10 October 2026</p>
 <p class="lang"><b>English</b> · <a href="#zh">简体中文</a></p>
 
 <p>CellPilot is an iPhone app that works with a backend you run yourself, next to your own
@@ -48,10 +48,12 @@ decrypt (see below).</p>
   <li>The pairing token and the addresses of your backend are kept in the iOS Keychain. The app
     keeps a copy of your conversations, calls and voicemails on the device so it opens quickly.
     Unpairing removes them.</li>
-  <li><b>Outbound limits</b>: to enforce the limits on calls and texts, the app keeps in the iOS
-    Keychain, for one day, a record of the numbers you called or texted, when, and a fingerprint of
-    each text (not the text itself). It stays on this iPhone, is not sent anywhere, and is kept
-    when the app is reinstalled. Your backend may keep a similar record.</li>
+  <li><b>Outbound limits</b>: to enforce the limits on calls and texts, the app keeps on this iPhone a
+    record of the numbers you called or texted and when (for a day), a fingerprint of each text (not
+    the text itself), when your last few calls ended, when it first saw each contact, caller and
+    sender (to tell when a number becomes familiar), the module's SIM identifier, and for a day who
+    sent you verification codes. It stays on this iPhone, is not sent anywhere, and most of it is
+    kept when the app is reinstalled. Your backend may keep a similar record.</li>
   <li><b>Microphone</b>: used only during calls, to carry your voice to your backend.</li>
   <li><b>Contacts</b>: read or written only when you choose to import or export contacts.</li>
   <li><b>Local network</b>: used to find and reach your backend on your own network.</li>
@@ -142,7 +144,7 @@ date. Questions: <a href="mailto:privacy@cellpilot.dev">privacy@cellpilot.dev</a
 
 <section id="zh" lang="zh-Hans">
 <h1>CellPilot 隐私政策</h1>
-<p class="meta">生效日期：2026 年 10 月 4 日</p>
+<p class="meta">生效日期：2026 年 10 月 10 日</p>
 <p class="lang"><a href="#en">English</a> · <b>简体中文</b></p>
 
 <p>CellPilot 是一个 iPhone App，配合你自己运行的后端使用，后端接着你自己的蜂窝模块和 SIM 卡。本政策说明
@@ -156,7 +158,7 @@ App 和 CellPilot 推送中转处理哪些数据，以及我们作为 CellPilot 
 <h2>在你的 iPhone 上</h2>
 <ul>
   <li>配对令牌和后端地址保存在 iOS 钥匙串里。App 在本机保存会话、通话和留言的副本，以便快速打开。取消配对会删除它们。</li>
-  <li><b>外发限制</b>：为执行拨号和短信的次数限制，App 会在 iOS 钥匙串里保存一天内你拨打或发短信的号码、时间，以及每条短信的指纹（不是短信内容本身）。这些记录只留在这台 iPhone 上，不会发送到任何地方，重新安装 App 也会保留。你的后端可能保存类似的记录。</li>
+  <li><b>外发限制</b>：为执行拨号和短信的限制，App 会在这台 iPhone 上保存：一天内你拨打或发短信的号码和时间、每条短信的指纹（不是短信内容本身）、最近几通电话的结束时间、第一次看到每个联系人和来电来信号码的时间（用来判断号码何时变成熟悉的号码）、模块里 SIM 卡的标识，以及一天内给你发验证码的发送方。这些记录只留在这台 iPhone 上，不会发送到任何地方，大部分在重新安装 App 后也会保留。你的后端可能保存类似的记录。</li>
   <li><b>麦克风</b>：只在通话时使用，把你的声音传给你的后端。</li>
   <li><b>通讯录</b>：只在你选择导入或导出联系人时读写。</li>
   <li><b>本地网络</b>：用于在你自己的网络里找到并连接你的后端。</li>

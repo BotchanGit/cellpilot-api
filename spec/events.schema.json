@@ -10,6 +10,7 @@
     { "$ref": "#/$defs/audio" },
     { "$ref": "#/$defs/message" },
     { "$ref": "#/$defs/conversations" },
+    { "$ref": "#/$defs/blocklist" },
     { "$ref": "#/$defs/contacts" },
     { "$ref": "#/$defs/calls" },
     { "$ref": "#/$defs/voicemail" },
@@ -81,15 +82,22 @@
       "properties": { "type": { "const": "message" }, "message": { "$ref": "openapi.json#/components/schemas/Message" }, "rev": { "$ref": "#/$defs/revValue" } }
     },
     "conversations": {
-      "description": "The conversation list (and, with trash, the trash) changed: the whole lists.",
+      "description": "The conversation list (and, with trash, the trash; with spam, the spam folder) changed: the whole lists.",
       "type": "object",
       "required": ["type", "conversations"],
       "properties": {
         "type": { "const": "conversations" },
         "conversations": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Conversation" } },
         "trash": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Conversation" } },
+        "spam": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/Conversation" } },
         "rev": { "$ref": "#/$defs/revValue" }
       }
+    },
+    "blocklist": {
+      "description": "The blocklist changed (with spam): the whole list.",
+      "type": "object",
+      "required": ["type", "numbers"],
+      "properties": { "type": { "const": "blocklist" }, "numbers": { "type": "array", "items": { "$ref": "openapi.json#/components/schemas/BlockedNumber" } }, "rev": { "$ref": "#/$defs/revValue" } }
     },
     "contacts": {
       "type": "object",

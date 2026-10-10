@@ -191,6 +191,7 @@ function undeclaredNull(obj, where, has) {
   if (!isObj(obj)) return;
   if (!has('places') && 'place' in obj) must(obj.place === null, `${where}.place is ${JSON.stringify(obj.place)}; without places it is null`);
   if (!has('contacts')) for (const k of ['name', 'contactId']) if (k in obj) must(obj[k] === null, `${where}.${k} is ${JSON.stringify(obj[k])}; without contacts it is null`);
+  if (!has('spam') && 'spam' in obj) must(obj.spam === null, `${where}.spam is ${JSON.stringify(obj.spam)}; without spam it is null`);
 }
 
 // ---- HTTP -------------------------------------------------------------------------------------
@@ -234,7 +235,7 @@ function errorEnvelope(r, status, codes) {
 
 // ---- the checks -------------------------------------------------------------------------------
 
-const FEATURES = ['push', 'portal', 'contacts', 'search', 'trash', 'voicemail', 'transcription', 'settings', 'security', 'log', 'places', 'screening', 'snapshot', 'notify'];
+const FEATURES = ['push', 'portal', 'contacts', 'search', 'trash', 'voicemail', 'transcription', 'settings', 'security', 'log', 'places', 'screening', 'snapshot', 'notify', 'spam'];
 const firstFew = (list, n = 20) => list.slice(0, n);
 
 async function main() {
@@ -344,6 +345,7 @@ async function main() {
     security: ['/security', '/security'],
     log: ['/log?limit=5', '/log'],
     push: ['/push', '/push'],
+    spam: ['/spam', '/spam'],
   };
   for (const [feature, [path, route]] of Object.entries(featureRoute)) {
     if (has(feature)) {
@@ -354,6 +356,9 @@ async function main() {
       });
     }
   }
+
+  if (has('spam')) await check('spam: GET /v1/blocklist', async () => { const b = await ok('/blocklist'); return `${b.numbers.length} entr(ies)`; });
+  if (has('spam')) await check('spam: GET /v1/spam/keywords', async () => { const b = await ok('/spam/keywords'); return `${b.keywords.length} entr(ies), list version ${b.version}`; });
 
   let snapRev;
   if (has('snapshot')) {
@@ -367,6 +372,7 @@ async function main() {
         else must(s[k] === null, `snapshot.${k} is not null without ${f}`);
       }
       if (!has('trash')) must(s.trash.length === 0, 'snapshot.trash is not [] without trash');
+      if (has('spam')) must(Array.isArray(s.spam) && Array.isArray(s.blocklist), 'snapshot.spam or snapshot.blocklist is missing although spam is declared');
       if (!has('voicemail')) must(s.voicemails.length === 0, 'snapshot.voicemails is not [] without voicemail');
       snapRev = s.rev;
       return `rev ${s.rev}, badge ${s.badge}`;
@@ -522,6 +528,7 @@ async function writeChecks({ has, myClientId }) {
     }
 
     if (opt.sim) await arrivalChecks(stream, { has, myClientId, audioReady, badge: badge() });
+    if (opt.sim && has('spam')) await spamChecks(stream);
 
     await check('write: every event frame matches events.schema.json', async () => {
       const bad = stream.frames.flatMap((f, i) => frameDepartures(f, `frame ${i} (${f?.type})`));
@@ -678,6 +685,95 @@ async function arrivalChecks(stream, { has, myClientId, audioReady, badge }) {
       });
     }
   }
+}
+
+/**
+ * With `spam` and the simulation hooks: the blocklist, a blocked sender's text and call, strong and
+ * medium wording, taking a conversation out of spam, and a report (spec: *Spam and blocking*).
+ */
+async function spamChecks(stream) {
+  await check('spam: PATCH /v1/spam/keywords/{id} switches an entry off and on; an unknown one is 404', async () => {
+    const list = (await ok('/spam/keywords')).keywords;
+    must(list.length > 0, 'the backend applies no wording list');
+    const id = list[0].id;
+    must((await call('PATCH', `/spam/keywords/${encodeURIComponent(id)}`, { enabled: false })).status === 200, 'off refused');
+    must((await ok('/spam/keywords')).keywords.find((k) => k.id === id)?.effective === 'off', 'not off after switching it off');
+    must((await call('PATCH', `/spam/keywords/${encodeURIComponent(id)}`, { enabled: true })).status === 200, 'on refused');
+    errorEnvelope(await call('PATCH', '/spam/keywords/no-such-entry', { enabled: false }), 404, ['not_found']);
+    errorEnvelope(await call('PATCH', `/spam/keywords/${encodeURIComponent(id)}`, { enabled: 'no' }), 400, ['invalid_request']);
+    return id;
+  });
+  const blocked = '+15555550177';
+  const strong = '+15555550178';
+  const medium = '+15555550179';
+  let from = stream.frames.length;
+  const added = await check(`spam: POST /v1/blocklist ${blocked}; a blocklist event lists it`, async () => {
+    const r = await call('POST', '/blocklist', { number: blocked });
+    must(r.status === 200, `answered ${r.status}`);
+    await stream.waitFor((x) => x.type === 'blocklist' && x.numbers?.some((n) => n.number === blocked), 'blocklist', 5000, from);
+    errorEnvelope(await call('POST', '/blocklist', { number: '<nonsense>' }), 400, ['invalid_request']);
+    return 'a nonsense entry is 400';
+  });
+  if (added) {
+    from = stream.frames.length;
+    await check('spam: a blocked sender\'s text is spam (blocked), in the spam folder, not notified', async () => {
+      const text = `api-check blocked ${Date.now() % 100000}`;
+      await sim('sms', { from: blocked, text });
+      const f = await stream.waitFor((x) => x.type === 'message' && x.message?.body === text, 'message', 8000, from);
+      must(f.message.spam?.verdict === 'spam' && f.message.spam?.reason === 'blocked', `spam is ${JSON.stringify(f.message.spam)}`);
+      const c = await stream.waitFor((x) => x.type === 'conversations' && x.spam?.some((v) => v.peer === f.message.peer), 'conversations with spam', 5000, from);
+      must(!c.conversations.some((v) => v.lastBody === text), 'the spam is in the inbox list too');
+      await sleep(1200);
+      must(!stream.frames.slice(from).some((x) => x.type === 'notify' && x.id === `sms-${f.message.id}`), 'a notify was sent for spam');
+      const list = await ok('/spam');
+      must(list.conversations.some((v) => v.peer === f.message.peer && v.spam?.reason === 'blocked'), 'GET /v1/spam does not list it with its reason');
+      const msgs = await ok(`/spam/${encodeURIComponent(f.message.peer)}/messages`, '/spam/{peer}/messages');
+      must(msgs.messages.some((m) => m.id === f.message.id), 'GET /v1/spam/{peer}/messages does not have it');
+      return `message ${f.message.id}`;
+    });
+    from = stream.frames.length;
+    await check('spam: a blocked number\'s call is refused unseen: no call event, a blocked record', async () => {
+      await sim('call', { from: blocked });
+      const f = await stream.waitFor((x) => x.type === 'calls' && x.calls?.[0]?.outcome === 'blocked', 'calls with a blocked record', 8000, from);
+      must(f.calls[0].seen !== false, 'a blocked call is counted unseen');
+      must(!stream.frames.slice(from).some((x) => x.type === 'call' && x.call?.number === blocked), 'a call event showed the blocked caller');
+      return `call ${f.calls[0].id}`;
+    });
+    from = stream.frames.length;
+    await check('spam: POST /v1/spam/restore puts it back in the inbox', async () => {
+      const peer = (await ok('/spam')).conversations.find((v) => v.spam?.reason === 'blocked')?.peer;
+      must(peer, 'nothing blocked in the spam folder');
+      must((await call('POST', '/spam/restore', { peers: [peer] })).status === 200, 'restore refused');
+      await stream.waitFor((x) => x.type === 'conversations' && x.conversations?.some((v) => v.peer === peer) && !x.spam?.some((v) => v.peer === peer), 'conversations', 5000, from);
+    });
+    await check(`spam: DELETE /v1/blocklist/${blocked}; the blocklist event drops it`, async () => {
+      from = stream.frames.length;
+      must((await call('DELETE', `/blocklist/${encodeURIComponent(blocked)}`)).status === 200, 'refused');
+      await stream.waitFor((x) => x.type === 'blocklist' && !x.numbers?.some((n) => n.number === blocked), 'blocklist', 5000, from);
+    });
+  }
+  from = stream.frames.length;
+  await check('spam: strong scam wording is spam (keyword, entry id), medium only suspect and notified', async () => {
+    await sim('sms', { from: strong, text: 'Hi Mom, this is my new number, save it' });
+    const a = await stream.waitFor((x) => x.type === 'message' && x.message?.peer?.endsWith('5555550178'), 'message', 8000, from);
+    must(a.message.spam?.verdict === 'spam' && a.message.spam?.reason === 'keyword' && a.message.spam?.detail, `strong: ${JSON.stringify(a.message.spam)}`);
+    await sim('sms', { from: medium, text: 'Your Apple ID is locked, verify now' });
+    const b = await stream.waitFor((x) => x.type === 'message' && x.message?.peer?.endsWith('5555550179'), 'message', 8000, from);
+    must(b.message.spam?.verdict === 'suspect', `medium: ${JSON.stringify(b.message.spam)}`);
+    const n = await stream.waitFor((x) => x.type === 'notify' && x.id === `sms-${b.message.id}`, 'notify for the suspect text', 6000, from);
+    stream.send({ type: 'ack', id: n.id, kind: n.kind, state: 'foreground' });
+    return `${a.message.spam.detail}`;
+  });
+  from = stream.frames.length;
+  await check('spam: POST /v1/spam/report then purge takes the conversation out of the inbox and blocks the sender', async () => {
+    const peer = (await ok('/conversations')).conversations.find((v) => v.peer.endsWith('5555550179'))?.peer;
+    must(peer, 'the suspect conversation is not in the inbox');
+    errorEnvelope(await call('POST', '/spam/report', { peers: [peer] }), 400, ['invalid_request']);
+    must((await call('POST', '/spam/report', { peers: [peer], then: 'purge' })).status === 200, 'report refused');
+    await stream.waitFor((x) => x.type === 'conversations' && !x.conversations?.some((v) => v.peer === peer), 'conversations', 5000, from);
+    await stream.waitFor((x) => x.type === 'blocklist' && x.numbers?.some((n) => n.number === peer), 'blocklist with the reported sender', 5000, from);
+    await call('DELETE', `/blocklist/${encodeURIComponent(peer)}`);
+  });
 }
 
 /** Pairing again replaces a client's token (the old one 401); signing out makes it 410. A throwaway client. */

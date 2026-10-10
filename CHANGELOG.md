@@ -7,6 +7,76 @@ change. Tools are versioned with the repository.
 
 [中文说明见下方](#中文)
 
+## 2026-10-10
+
+### Changed rule — outbound limits
+
+The limits are stricter, and the app now judges only by what it has seen itself, so a backend's
+claims cannot widen them. *What to change:* a backend applying the limits should follow the
+updated table in the specification (*Outbound limits*); new `details.rule` values may come back
+with `429 outbound_limited`.
+
+- **Familiar** now takes three days: since the contact was made or the number first called or
+  texted. The app counts from when it first saw the number and lets at most 5 numbers become
+  familiar a day.
+- **Totals**: 10 calls (was 20) and 20 texts (was 30) a day.
+- **New rules**: `call-burst` and `text-burst` (at most 3 different numbers within 15 minutes for
+  calls, 10 for texts), `short-calls` (3 calls in a row to different numbers, each over within 15
+  seconds, pause calling for 30 minutes), `code-relay` (a verification code received in the last
+  10 minutes cannot be sent on), `code-flood` (codes from 10 or more senders in a day pause
+  everything), `sim-changed` (no unfamiliar numbers for a day after the SIM changes) and
+  `forbidden-code` (no dial strings that set up call forwarding or hide the caller id).
+- **Locks** last 7 days when the previous one began less than a week before.
+- In the app only: a text that reads like a scam is sent only after the user confirms, and
+  counts as a strike when the wording is strong; international, premium-rate and one-ring call-backs are asked about first;
+  links in received texts open only after the user confirms.
+
+### Added — scam-wording list
+
+- [`spec/scam-keywords.json`](spec/scam-keywords.json): the wording the app asks about before
+  sending, and which a backend may use to flag incoming texts. Entries are combinations of terms,
+  graded strong or medium; warning markers keep anti-fraud warnings, which quote scam wording,
+  from matching medium entries. It is tuned for precision: on texts it was not tuned on, it
+  catches about a quarter of scams and flags about 2% of deliberately scam-like genuine texts,
+  none of them with a strong entry. It will be updated.
+
+### Added — spam and blocking (feature `spam`)
+
+A backend can now screen what arrives and keep spam out of the inbox; see *Spam and blocking* in
+the specification. Nothing changes for a backend that does not declare `spam`.
+
+- Messages carry `spam`: `null`, or a verdict (`spam` out of the inbox, `suspect` marked in it) with
+  its reason (`blocked`, `keyword`, `classifier`, `report`). Strong entries of the wording list file a
+  text as spam, medium ones mark it; a link alone is no reason. Someone the user knows (a contact,
+  someone they have texted, a sender they took out of spam) is never filed except by the blocklist,
+  only marked.
+- A recommended method for the backend's own judgement: a naive Bayes model learnt from the
+  backend's own examples (judging only with enough genuine examples, mostly ordinary texts kept a
+  week; spam only when nearly sure and from a personal number, never for a text with a
+  verification code) and six signals, counted in points (strong wording 2, medium wording 1, each
+  signal 1, the model 1 or 2): two file a text, one marks it.
+  `detail` lists what counted (`keyword:`, `signal:`, `words:`), which the app words in the user's language. Warning
+  markers from an official sender now cancel strong entries too (list version 2, with Traditional
+  Chinese markers).
+- The wording list as a backend applies it (`GET /v1/spam/keywords`): what each entry caught, how
+  often its catches were taken out of spam or reported, demoted after too many mistakes; any entry
+  can be switched off (`PATCH /v1/spam/keywords/{id}`).
+- The spam folder (`GET /v1/spam`, `GET /v1/spam/{peer}/messages`, `POST /v1/spam/restore`,
+  `POST /v1/spam/purge`), reporting spam that got through (`POST /v1/spam/report`, which also
+  blocks the sender), and the blocklist
+  (`GET`/`POST /v1/blocklist`, `DELETE /v1/blocklist/{number}`, the `blocklist` event). The
+  `conversations` event and the snapshot carry `spam`; the snapshot carries `blocklist`.
+- A blocked number's call is refused before anyone is rung and recorded with the new outcome
+  `blocked`. Spam and blocked calls are told with one quiet push each, category `spam`, never
+  quoting the text.
+- What the judgement learns from — reports, messages taken out of spam — stays on the backend; the
+  specification gives the format.
+
+### Testing
+
+- A new optional simulation hook, `GET /_sim/state`: what the far end has received (texts sent,
+  keys pressed, the call), so a test can check that a text really left or was held back.
+
 ## 2026-10-04
 
 ### Added — outbound limits; what CellPilot is for
@@ -107,6 +177,37 @@ First public release of the CellPilot Device API v1.
 ---
 
 ## 中文
+
+### 2026-10-10
+
+**规则变更：外发限制**
+
+限制更严格了，而且 App 现在只依据它自己看到的情况判断，后端怎么说都放宽不了。*需要改的：* 执行外发限制的后端，按规范里更新后的表格（“外发限制”）调整；`429 outbound_limited` 可能带回新的 `details.rule` 值。
+
+- **熟悉的号码**现在要满三天：从建立联系人或第一次来电、来短信算起。App 从它自己第一次看到这个号码算起，每天最多让 5 个号码变成熟悉的号码。
+- **总量**：每天 10 通电话（原来 20）、20 条短信（原来 30）。
+- **新增规则**：`call-burst` 和 `text-burst`（15 分钟内最多拨打、10 分钟内最多发短信给 3 个不同号码）、`short-calls`（连续 3 通打给不同号码且每通都不到 15 秒，暂停拨号 30 分钟）、`code-relay`（最近 10 分钟收到的验证码不能转发）、`code-flood`（一天内收到 10 个以上不同发送方的验证码，暂停一切外发）、`sim-changed`（换卡后 24 小时内不能联系不熟悉的号码）和 `forbidden-code`（不能拨打设置呼叫转移或隐藏主叫号码的代码）。
+- **锁定**：距上一次锁定不到一周又被锁定的，锁 7 天。
+- 只在 App 里：像诈骗话术的短信要用户确认后才发送，命中强关键词时计一次违规；拨打国际长途、高额收费号码或回拨"响一声"的号码前先确认；收到的短信里的链接要确认后才打开。
+
+**新增：诈骗话术关键词表**
+
+- [`spec/scam-keywords.json`](spec/scam-keywords.json)：App 发送前会询问的话术，后端也可以用来标记收到的短信。每条是若干词的组合，分强、中两级；提醒用语可以让引用诈骗说法的反诈提醒不命中中等关键词。它以准确为先：在没参与调整的样本上，大约能识别四分之一的诈骗短信，对刻意挑选的、最像诈骗的正常短信误伤约 2%，而且都不是强关键词。之后会持续更新。
+
+**新增：垃圾短信与黑名单（特性 `spam`）**
+
+后端现在可以筛查收到的东西，把垃圾短信挡在收件箱外；见规范里的“垃圾短信与黑名单”。没有声明 `spam` 的后端什么都不用改。
+
+- 短信带 `spam`：`null`，或一个结论（`spam` 不进收件箱，`suspect` 在收件箱里带标记）和理由（`blocked`、`keyword`、`classifier`、`report`）。话术表的强条目把短信归入垃圾短信，中等条目只标记；只有链接不算理由。用户认识的人（联系人、给对方发过短信的号码、从垃圾短信里移出过的发送方）除了黑名单不会被归入，只会被标记。
+- 推荐的后端判断方法：从后端自己的样本学出来的朴素贝叶斯模型（正常样本足够才参与，主要是保留了一周的日常短信；只有很有把握、且来自个人号码才归入垃圾短信，含验证码的短信不会因它被归入），以及六个信号，按分计算（强话术 2 分、中等话术 1 分、每个信号 1 分、模型 1 或 2 分）：满 2 分归入垃圾短信，1 分打标记。`detail` 列出计分项（`keyword:`、`signal:`、`words:`），App 按用户的语言显示。官方号码发来的提醒用语现在也会让强条目不算命中（话术表第 2 版，补充了繁体提醒用语）。
+- 后端实际应用的话术表（`GET /v1/spam/keywords`）：每个条目拦了多少、被移出和被举报多少，误判太多时自动降级；任何条目都可以关掉（`PATCH /v1/spam/keywords/{id}`）。
+- 垃圾短信文件夹（`GET /v1/spam`、`GET /v1/spam/{peer}/messages`、`POST /v1/spam/restore`、`POST /v1/spam/purge`），举报漏网的垃圾短信（`POST /v1/spam/report`，同时拉黑发送方），以及黑名单（`GET`/`POST /v1/blocklist`、`DELETE /v1/blocklist/{number}`、`blocklist` 事件）。`conversations` 事件和快照带 `spam`；快照带 `blocklist`。
+- 黑名单号码的来电在任何人被呼叫之前就被拒接，记为新的结局 `blocked`。垃圾短信和被拦截的来电各发一条静默推送，类别 `spam`，绝不包含短信内容。
+- 判断所学习的东西——举报、从垃圾短信里移出的短信——留在后端；规范给出了格式。
+
+**测试**
+
+- 新增可选的模拟钩子 `GET /_sim/state`：对方收到了什么（发出的短信、按的键、当前通话），测试可以借此确认一条短信确实发了出去，或确实被拦下。
 
 ### 2026-10-04
 

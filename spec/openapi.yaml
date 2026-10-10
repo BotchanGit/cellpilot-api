@@ -545,6 +545,155 @@ paths:
         "200": { $ref: "#/components/responses/Empty" }
         "400": { $ref: "#/components/responses/Error" }
 
+  /spam:
+    get:
+      operationId: listSpam
+      tags: [messages]
+      summary: "Conversations in the spam folder"
+      x-feature: spam
+      responses:
+        "200":
+          description: "Spam conversations"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+  /spam/{peer}/messages:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    get:
+      operationId: listSpamMessages
+      tags: [messages]
+      summary: "A peer's spam messages, newest first"
+      x-feature: spam
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Messages" }
+  /spam/restore:
+    post:
+      operationId: restoreSpam
+      tags: [messages]
+      summary: "Not spam: put a peer's spam back in the inbox and trust the peer"
+      x-feature: spam
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/purge:
+    post:
+      operationId: purgeSpam
+      tags: [messages]
+      summary: "Delete spam for good"
+      x-feature: spam
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/report:
+    post:
+      operationId: reportSpam
+      tags: [messages]
+      summary: "Report conversations as spam: block the senders, then trash or delete the conversations"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [peers, then]
+              properties:
+                peers: { type: array, items: { type: string }, minItems: 1 }
+                then: { type: string, enum: [trash, purge], description: '"trash" moves them to the trash (with the trash feature), "purge" deletes them for good.' }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/keywords:
+    get:
+      operationId: listSpamKeywords
+      tags: [messages]
+      summary: "The scam-wording list as this backend applies it"
+      x-feature: spam
+      responses:
+        "200":
+          description: "Each entry with its counts and whether it is demoted or switched off"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, keywords]
+                properties:
+                  version: { type: integer }
+                  keywords: { type: array, items: { $ref: "#/components/schemas/SpamKeyword" } }
+  /spam/keywords/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: "The entry id" }
+    patch:
+      operationId: setSpamKeyword
+      tags: [messages]
+      summary: "Switch a wording entry off or on"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean, description: "false switches it off on this backend; true back on." }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /blocklist:
+    get:
+      operationId: getBlocklist
+      tags: [messages]
+      summary: "The blocklist"
+      x-feature: spam
+      responses:
+        "200":
+          description: "Blocked numbers and sender names, newest first"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [numbers]
+                properties:
+                  numbers: { type: array, items: { $ref: "#/components/schemas/BlockedNumber" } }
+    post:
+      operationId: addToBlocklist
+      tags: [messages]
+      summary: "Block a number or a sender name"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number]
+              properties:
+                number: { type: string, description: "A number (3–20 digits after stripping grouping, optional +) or a sender name (1–20 letters, digits, spaces, - or _)." }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /blocklist/{number}:
+    parameters:
+      - { name: number, in: path, required: true, schema: { type: string }, description: "A blocklist entry, URL-encoded." }
+    delete:
+      operationId: removeFromBlocklist
+      tags: [messages]
+      summary: "Unblock"
+      x-feature: spam
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+
   /contacts:
     get:
       operationId: listContacts
@@ -880,7 +1029,7 @@ components:
               additionalProperties: true
               properties:
                 field: { type: string, description: 'The field that was wrong; nested fields joined with dots ("voicemail.answerAfterS").' }
-                rule: { type: string, enum: [stranger-calls, hotline-calls, calls-per-day, call-gap, stranger-texts, link-to-stranger, same-text, texts-per-day, locked], description: "`outbound_limited`: which outbound limit refused it." }
+                rule: { type: string, enum: [calls-per-day, stranger-calls, hotline-calls, call-gap, call-burst, short-calls, texts-per-day, stranger-texts, text-burst, link-to-stranger, same-text, code-relay, code-flood, sim-changed, forbidden-code, locked], description: "`outbound_limited`: which outbound limit refused it." }
                 limit: { type: [integer, "null"], description: "The limit reached: an outbound limit (`outbound_limited`), or the paired-phone limit (`POST /v1/pair`); null when the rule has no number." }
                 retryAt: { type: [string, "null"], format: date-time, description: "`outbound_limited`: when the same request would be allowed again; null when it never will (a link to a stranger)." }
 
@@ -984,6 +1133,8 @@ components:
         features: { type: array, items: { type: string } }
         conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
         trash: { type: array, items: { $ref: "#/components/schemas/Conversation" }, description: "The trash; [] without the trash feature." }
+        spam: { type: array, items: { $ref: "#/components/schemas/Conversation" }, description: "The spam folder; [] without the spam feature." }
+        blocklist: { type: array, items: { $ref: "#/components/schemas/BlockedNumber" }, description: "The blocklist; [] without the spam feature." }
         calls: { type: array, items: { $ref: "#/components/schemas/CallRecord" }, description: "The newest page of the history (100 records)." }
         voicemails: { type: array, items: { $ref: "#/components/schemas/Voicemail" }, description: "[] without the voicemail feature." }
         client:
@@ -1121,8 +1272,8 @@ components:
         endedAt: { type: [string, "null"], format: date-time }
         outcome:
           type: string
-          enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress]
-          description: "in-progress until connected; answered while connected (never final); completed once a connected call ends; voicemail when the answering machine took it and kept a message (a call taken over from it becomes answered, then completed); missed for an incoming call never connected, or taken by the machine without a message; busy / no-answer / failed for an outgoing one; rejected optional (declined). See the specification, *The history*."
+          enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress, blocked]
+          description: "in-progress until connected; answered while connected (never final); completed once a connected call ends; voicemail when the answering machine took it and kept a message (a call taken over from it becomes answered, then completed); missed for an incoming call never connected, or taken by the machine without a message; busy / no-answer / failed for an outgoing one; rejected optional (declined). See the specification, *The history*. blocked (with `spam`): an incoming call from a blocked number, refused before anyone was rung; seen."
         durationS: { type: [integer, "null"], description: "From connecting (the machine's pickup for one it took) to the end; null if it never connected or has not ended." }
         endReason: { type: [string, "null"], description: "Why a failed call failed, in the reader's language; null otherwise." }
         place: { type: [string, "null"], description: With the `places` feature. }
@@ -1141,6 +1292,9 @@ components:
         lastAt: { type: string, format: date-time }
         lastDirection: { type: string, enum: [in, out] }
         unread: { type: integer, description: "Unread incoming messages; always 0 for a conversation in the trash." }
+        spam:
+          oneOf: [{ $ref: "#/components/schemas/Spam" }, { type: "null" }]
+          description: "In the spam folder only: the verdict of the newest spam message."
 
     Message:
       type: object
@@ -1162,6 +1316,37 @@ components:
           description: "For a message of several parts: how many have arrived. Kept once complete (received equal to total); null for a message of one part."
         error: { type: [string, "null"], description: Why a failed message failed; null otherwise. }
         read: { type: boolean }
+        spam:
+          oneOf: [{ $ref: "#/components/schemas/Spam" }, { type: "null" }]
+          description: "The screening verdict, with the `spam` feature; null for an ordinary message."
+
+    Spam:
+      type: object
+      required: [verdict, reason, detail]
+      properties:
+        verdict: { type: string, enum: [spam, suspect], description: "spam: kept out of the inbox, in the spam folder; suspect: in the inbox, marked as a possible scam." }
+        reason: { type: string, enum: [blocked, keyword, classifier, report], description: "blocked: the sender is on the blocklist; keyword: the wording list (strong → spam, medium → suspect); classifier: the backend's own judgement; report: the user reported it." }
+        detail: { type: [string, "null"], description: "keyword: the entry id; classifier: the parts that counted, separated by ;: `keyword:<id>`, `words:<phrase>,…`, `signal:<id>,…` (ip-link, odd-tld-link, signature-from-mobile, chat-handle-money, short-link-from-mobile, link-money-from-mobile) or free text (≤ 80 characters), or null; otherwise null." }
+
+    SpamKeyword:
+      type: object
+      required: [id, terms, listed, effective, hits, restored, reported, enabled]
+      properties:
+        id: { type: string }
+        terms: { type: array, items: { type: string } }
+        listed: { type: string, enum: [strong, medium] }
+        effective: { type: string, enum: [strong, medium, "off"], description: "As this backend applies it: demoted to medium after 3 or more texts it filed were taken out of spam, more than it was reported; off when switched off." }
+        hits: { type: integer }
+        restored: { type: integer }
+        reported: { type: integer }
+        enabled: { type: boolean }
+
+    BlockedNumber:
+      type: object
+      required: [number, addedAt]
+      properties:
+        number: { type: string }
+        addedAt: { type: string, format: date-time }
 
     Contact:
       type: object

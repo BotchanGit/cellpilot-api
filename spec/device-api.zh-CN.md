@@ -21,30 +21,39 @@ CellPilot 的设计初衷，是让只能使用 eSIM 的 iPhone 用户，不错�
 
 ### 外发限制
 
-不论后端如何，App 都会限制用户能拨打和发短信的范围；后端应当对 `POST /v1/call/dial` 和 `POST /v1/messages` 执行同样的限制，这样直接调用 API 也受同样约束。`cellpilotd` 已经这样做。发送时，号码分为四类：
+不论后端如何，App 都会限制用户能拨打和发短信的范围，而且只依据 App 自己看到的情况判断；后端应当对 `POST /v1/call/dial` 和 `POST /v1/messages` 执行同样的限制，这样直接调用 API 也受同样约束。`cellpilotd` 已经这样做。发送时，号码分为四类：
 
 | 类别 | 含义 |
 | --- | --- |
 | 紧急号码 | 不带 `+` 的 `110`、`112`、`119`、`120`、`122`、`911`、`999`、`000`、`995`。不受限制。 |
-| 熟悉的号码 | 联系人，或者给这条线路打过电话、发过短信的号码（按“联系人”的匹配规则）。 |
+| 熟悉的号码 | 联系人，或者给这条线路打过电话、发过短信的号码（按“联系人”的匹配规则），并且已经认识至少 **3 天**：从建立联系人或第一次来电、来短信算起。App 从它自己第一次看到这个号码算起，并且每天最多让 5 个号码变成熟悉的号码。 |
 | 热线 | 短号（3–6 位）、免费电话、分摊付费或增值号码，或短信网关号（见“号码”）。 |
 | 陌生号码 | 其他号码。 |
 
-任意 24 小时内：
+规则（`details.rule`），除非另有说明，都按最近 24 小时计算：
 
-| 规则（`details.rule`） | 限制 |
-| --- | --- |
-| `stranger-calls` | 拨打 3 个不同的陌生号码。再次拨打其中一个不算新的。 |
-| `hotline-calls` | 拨打 10 个不同的热线。 |
-| `calls-per-day` | 20 通电话，包括熟悉的号码。 |
-| `call-gap` | 两次拨号间隔 30 秒。 |
-| `stranger-texts` | 给 3 个不同的陌生号码发短信。 |
-| `link-to-stranger` | 带链接的短信只能发给熟悉的号码。 |
-| `same-text` | 同一条短信最多发给 2 个不同号码。比较时去掉大小写、空格、标点和数字；剩下不足 8 个字符的不比较。 |
-| `texts-per-day` | 30 条短信。 |
-| `locked` | 24 小时内被 `call-gap` 以外的规则拒绝两次，从第二次起 24 小时内，除熟悉的号码和紧急号码外，暂停拨号和短信。 |
+| 规则 | 限制 | 是否计违规 |
+| --- | --- | --- |
+| `calls-per-day` | 10 通电话，包括熟悉的号码。 | 是 |
+| `stranger-calls` | 拨打 3 个不同的陌生号码。再次拨打其中一个不算新的。 | 是 |
+| `hotline-calls` | 拨打 10 个不同的热线。 | 是 |
+| `call-gap` | 两次拨号间隔 30 秒。 | 否 |
+| `call-burst` | 15 分钟内最多拨打 3 个不同号码，不论是否熟悉。 | 是 |
+| `short-calls` | 连续 3 通打给不同号码、每通从拨出到结束都不到 15 秒，从最后一通结束起暂停拨号 30 分钟。 | 首次出现这种模式时计一次 |
+| `texts-per-day` | 20 条短信。 | 是 |
+| `stranger-texts` | 给 3 个不同的陌生号码发短信。 | 是 |
+| `text-burst` | 10 分钟内最多给 3 个不同号码发短信，不论是否熟悉。 | 是 |
+| `link-to-stranger` | 带链接的短信只能发给熟悉的号码。 | 是 |
+| `same-text` | 同一条短信最多发给 2 个不同号码。比较时去掉大小写、空格、标点和数字；剩下不足 8 个字符的不比较。 | 是 |
+| `code-relay` | 不能把这条线路最近 10 分钟内收到的验证码（按“短信”一节的规则识别：短信里明确说是验证码的数字）发给任何人。 | 是 |
+| `code-flood` | 24 小时内收到来自 10 个或更多不同发送方的验证码时，暂停一切外发（通话和短信），直到少于 10 个：这条线路在替别人接收验证码。 | 否 |
+| `sim-changed` | SIM 卡更换（IMSI 变了）后 24 小时内，不能拨打或发短信给不熟悉的号码。 | 否 |
+| `forbidden-code` | 不能拨打设置呼叫转移的代码（`**21*`、`*21*`、`**61*`、`**62*`、`**67*`、`**002*`、`**004*` 及单星号形式），也不能拨打隐藏本次主叫号码的代码（`#31#`、`*31#`、号码前的 `*67`）。查询（`*#21#`）或取消（`##21#`）可以。 | 是 |
+| `locked` | 24 小时内计两次违规，从第二次起 24 小时内，除熟悉的号码和紧急号码外暂停拨号和短信；距上一次锁定不到 7 天又被锁定的，锁定 7 天。 | 否 |
 
-同一个号码的不同写法（按“联系人”的匹配规则）算一个号码。只有放行的才计数；计数记录和短信、通话记录分开保存，删除对话不会清零。拒绝时，在记录或发送任何东西之前返回 `429 outbound_limited`，`details` 包括：`rule`、`limit`（`link-to-stranger` 和 `locked` 为 `null`）以及 `retryAt`，即同样的请求何时可以通过（永远不会通过时为 `null`）。App 根据这些字段用用户的语言解释原因；`message` 供日志使用。
+同一个号码的不同写法（按“联系人”的匹配规则）算一个号码。只有放行的才计数；计数记录和短信、通话记录分开保存，删除对话不会清零。拒绝时，在记录或发送任何东西之前返回 `429 outbound_limited`，`details` 包括：`rule`、`limit`（规则没有数字上限时为 `null`）以及 `retryAt`，即同样的请求何时可以通过（永远不会通过时为 `null`）。App 根据这些字段用用户的语言解释原因；`message` 供日志使用。
+
+另有两项检查只在 App 里做，因为要询问用户：措辞像诈骗话术的短信（按共用的关键词表 [scam-keywords.json](scam-keywords.json) 判断），用户确认后才发送，命中强关键词时计一次违规（匹配规则写在文件里）；拨打 SIM 卡所在国家以外的号码、高额收费号码，或回拨只响了一下的境外号码，用户确认后才拨出。收到的短信里的链接，用户确认后才打开。
 
 CellPilot 不能替代电话服务，不能依赖它拨打紧急电话：通话依赖互联网连接、后端、模块和运营商；紧急呼叫从模块所在地发出，可能接到错误的急救中心，对方看到的也是错误的位置。请使用普通电话。
 
@@ -119,7 +128,7 @@ CellPilot 仅为合法用途而制作。我们遵守法律法规，不认可、�
   "version": 1,
   "backend": { "name": "cellpilotd", "version": "0.1.0" },
   "features": ["push", "contacts", "search", "trash", "voicemail", "transcription",
-               "settings", "security", "log", "places", "screening", "portal", "snapshot", "notify"]
+               "settings", "security", "log", "places", "screening", "portal", "snapshot", "notify", "spam"]
 }
 ```
 
@@ -143,6 +152,7 @@ CellPilot 仅为合法用途而制作。我们遵守法律法规，不认可、�
 | `screening` | `POST /v1/call/screen`、`POST /v1/call/claim` | 让后端先接（答录）再由客户端接管。有 `voicemail` *并且*答录机开关打开（`settings.voicemail.enabled`）时声明。没有它，通话也不能在手机之间转移。 |
 | `portal` | `POST /v1/portal/session` | 后端有一个 App 可以打开的网页界面。 |
 | `snapshot` | `GET /v1/snapshot`、`hello` 和事件上的 `rev`、`rev` 事件 | 客户端保存的一切，同一个版本，一个请求拿完；见“事件流”。没有它，App 每次连上都逐个列表去读。 |
+| `spam` | `/spam`、`/spam/keywords`、`/blocklist`、短信的 `spam`、`outcome: "blocked"`、`blocklist` 事件、快照里的 `spam` 和 `blocklist` | 后端把垃圾短信挡在收件箱外，并拒接黑名单号码；见“垃圾短信与黑名单”。没有它所有短信都在收件箱里，也没有人被拉黑。 |
 | `notify` | `notify` 事件和客户端的 `ack` | 后端推送前先问在线的客户端；见“在线状态与 `notify`”。没有它后端直接推送，App 开着的手机自己显示横幅。 |
 
 有些字段和路由是可选的，App 没有它们也能用（只此一份清单，指南照抄）：
@@ -343,6 +353,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | `busy`、`no-answer` | 去电，模块报对方忙或无人接听；分辨不出的后端记为 `failed`。 |
 | `failed` | 去电因其他原因没接通，包括接通前自己挂断；网络给了原因时 `endReason` 说明。 |
 | `rejected` | 来电被拒接。可选：`cellpilotd` 把拒接记为 `missed`；App 把 `rejected` 显示为已拒接。 |
+| `blocked` | 黑名单号码的来电，在任何人被呼叫之前就被后端拒接（需要 `spam`）。`seen: true`；不算未接。 |
 
 后端重启或设备断开时仍未结束的记录在那一刻收尾：没接通的（`in-progress`）为 `failed`；`answered` 为 `completed`，结束时间为那一刻，时长算到那一刻；`voicemail` 如果答录机留下了留言，仍是 `voicemail`，结束时间为那一刻；没有留言则为 `missed`（`answeredAt` 和 `durationS` 为 `null`）——被重启打断的录音会丢失。`endReason` 只在 `failed` 时有值。隐藏号码的 `peer` 为 `""`。App 把 `answered` 和 `completed` 显示得一样，把 `missed` 和 `voicemail` 算作未接，`in-progress` 显示为进行中。
 
@@ -358,7 +369,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 收到的长短信从第一段起就是一条记录：每到一段发一次 `message` 事件——同一个 `id`，`body` 是目前拼好的，`parts: { "received", "total" }`——最后一段（`received` 等于 `total`）之后才发 `conversations` 并推送；到这时才通知。收齐后 `parts` 仍留在记录上。在那之前它和别的短信一样：在会话列表里（目前的正文作为 `lastBody`）、在搜索里、在未读数和角标里。
 
-`GET /v1/messages/search?q=`（有 `search` 时）查找不在回收站里、正文或号码包含 `q` 的短信——子串匹配，ASCII 字母不分大小写，`%` 和 `_` 按字面——新的在前；`limit` 默认 50、最多 200；`q` 为空回 `[]`。
+`GET /v1/messages/search?q=`（有 `search` 时）查找不在回收站和垃圾短信里、正文或号码包含 `q` 的短信——子串匹配，ASCII 字母不分大小写，`%` 和 `_` 按字面——新的在前；`limit` 默认 50、最多 200；`q` 为空回 `[]`。
 
 回收站装的是短信。`GET /v1/trash` 对每个有短信在回收站里的 peer 列一项，按这些短信汇总——所以一个 peer 可以同时出现在两个列表里——`unread` 总是 `0`。回收站里的短信不出现在 `/conversations/{peer}/messages`、搜索和角标里，也没有逐条读取的接口：按 peer 恢复或清除。`POST /v1/trash/restore` 和 `POST /v1/trash/purge` 带 `{ "peers": [...] }`（空的是 `400`；超过 500 个只处理前 500 个）：恢复把这个 peer 在回收站里的短信全部放回，清除把它们永久删除，不动这个 peer 在会话列表里的短信。移入回收站满 30 天的可以清除（`cellpilotd` 在启动时清除）。这些操作都发带 `trash` 的 `conversations` 事件。
 
@@ -378,6 +389,69 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 - **显示名。** `name` 由后端算出：姓或名任一部分是中日韩文字时，姓在前、不加空格（王小明）；否则名在前、空格分隔（John Smith）；只有一部分时原样显示，都没有时为 `""`。所有给对方起名的地方（`Conversation.name`、推送标题、CallKit）都用它。
 - **号码匹配。** 网络写号码是一种写法，人输入是另一种，所以联系人按数字而不是按字符串查找：只留数字，去掉开头的 `00`，再去掉开头所有的 0；两个键相等，或者一个是另一个的尾部且较短的至少七位，就是同一个号码。`+86 138 0013 8000`、`13800138000`、`013800138000` 是同一个号码；短号永远不会误配到长号的尾部。`Conversation.contactId`、`CallRecord.contactId`、`Call.contactId` 就是这样填的；几个联系人的号码都匹配时，`cellpilotd` 取最早存入的那个。
+
+## 垃圾短信与黑名单（特性 `spam`）
+
+后端会筛查收到的东西——用户拉黑的号码、[`scam-keywords.json`](scam-keywords.json) 里的诈骗话术，以及它自己的其他判断依据——把垃圾短信挡在收件箱外。App 显示结论，让用户纠正，并举报漏网的。判断所学习的一切都留在后端。
+
+**结论。** 有 `spam` 时，每条短信都带 `spam`：`null`，或 `{ "verdict", "reason", "detail" }`：
+
+| `verdict` | 去哪里 |
+| --- | --- |
+| `spam` | 不进收件箱，放进垃圾短信文件夹。不在 `/conversations`（列表和短信）、搜索、未读数和角标里；不通知（见下）。 |
+| `suspect` | 留在收件箱，照常通知；App 把它标为疑似诈骗。 |
+
+| `reason` | 何时 | `detail` |
+| --- | --- | --- |
+| `blocked` | 发送方在黑名单中。总是 `spam`。 | `null` |
+| `keyword` | 内容命中话术表：强条目为 `spam`，中等条目为 `suspect`。 | 条目的 `id` |
+| `classifier` | 后端自己的判断（模型、信号、它自己的名单），或话术与它们一起。 | 最多 80 个字符，或 `null`：用 `;` 分隔的各个计分项——`keyword:<条目 id>`、`signal:<id>,<id>`（见下）、`words:<短语>,<短语>`（影响最大的短语）——或自由文字，App 原样显示 |
+| `report` | 用户举报了它（见下）。总是 `spam`。 | `null` |
+
+只有链接不算理由：很多正常短信都带链接，App 打开前也会先确认。用户认识的人——联系人、给对方发过短信的号码，或用户从垃圾短信里移出过短信的发送方——除了黑名单，不会被放进垃圾短信：强话术和信号只给他们的短信打标记，中等话术和模型不管他们。这是降低权重，不是放行：伪基站可以冒充任何号码。短信保留它到达时的结论；改动黑名单不会重新判断旧短信。
+
+**`cellpilotd` 怎么判断，后端可以怎么做。** 黑名单发送方直接是 spam。其余按证据计分：强话术 2 分，中等话术 1 分，每个信号 1 分，从这个后端自己的样本（见下）学出来的模型概率 0.99 以上 2 分、0.9 以上 1 分。满 2 分放进垃圾短信，1 分打标记，所以弱证据会叠加：中等话术加一个信号就放进垃圾短信。三条限制：用户认识的人只会被标记，而且只看强话术和信号（中等话术和模型不管他们）；含验证码的短信只有强话术才能放进垃圾短信；官方号码（短信网关、短号、名称）发来的短信，模型最多算 1 分。话术表的提醒用语会让中等条目不算命中；发送方是官方号码时强条目也不算，这类反诈提醒也不交给模型判断。只有话术命中时记为 `keyword`，带条目 id；其他情况记为 `classifier`，列出每个计分项。
+
+模型是垃圾邮件过滤里沉淀下来的朴素贝叶斯形式（Robinson 的单词概率，出现次数少时向 0.5 收缩，取最有判别力的 15 个用 Fisher 卡方法合并）：短信先 NFKC 规范化并转小写，链接、金额、长串数字和其他数字换成占位符；每段连续的汉字（先去掉夹在中间的空格和符号）切成所有 2、3 字片段，其他文字按单词切；再加上发送方类型（手机、短信网关、短号、境外、名称）和各信号的特征。每个片段的概率按它在两类样本中所占的比例算，所以不论两类各有多少，权重相同。至少 20 个 spam 样本、至少 100 个正常样本、且正常样本不少于 spam 样本时才参与：它对这条线路平时收到什么了解多少，就能判断得多好。它的 `detail` 以 `words:` 列出文本里指向 spam 的连续段落，最强的在前。不附带预先训练好的模型。
+
+信号不论发送方是谁，每个算 1 分：
+
+| `signal:` id | 何时 |
+| --- | --- |
+| `ip-link` | 链接直接指向 IP 地址。 |
+| `signature-from-mobile` | 个人手机号或境外号码发来的短信，却带着机构的【签名】（银行、运营商、法院、平台……）。 |
+| `chat-handle-money` | 留了聊天联系方式（微信、QQ、WhatsApp、Telegram……），同时提到钱：金额、佣金、日结。 |
+| `short-link-from-mobile` | 个人手机号或境外号码发来的短链接（bit.ly、t.cn……）。 |
+| `odd-tld-link` | 链接用的是正规发送方很少用的顶级域名（.top、.xyz、.vip、.cc、.shop……）。 |
+| `link-money-from-mobile` | 个人手机号或境外号码发来的短信同时有链接和金额。 |
+
+**这个后端上的话术表。** `GET /v1/spam/keywords` 回 `{ "version", "keywords": [...] }`，后端应用的表里每个条目一项：`{ "id", "terms", "listed": "strong" | "medium", "effective": "strong" | "medium" | "off", "hits", "restored", "reported", "enabled" }`。`hits` 是它给出结论的短信数，`restored` 是它放进垃圾短信、被用户移出的数，`reported` 是它标记过、被用户举报的数。`restored` 达到 3 且多于 `reported` 的条目此后只打标记（`effective: "medium"`）；后端可以用别的规则。`PATCH /v1/spam/keywords/{id}`（`{ "enabled": false }`）在这个后端上关掉一个条目，`true` 重新打开；没有这个条目回 `404`。
+
+**垃圾短信文件夹**的用法和回收站一样。`GET /v1/spam` 按号码列出有垃圾短信的会话，由这些短信汇总，`unread: 0`，并带 `spam`——其中最新一条的结论。`GET /v1/spam/{peer}/messages` 分页读取一个号码的垃圾短信，和 `/conversations/{peer}/messages` 读收件箱一样。`POST /v1/spam/restore`（`{ "peers": [...] }`）表示*不是垃圾短信*：把这个号码的垃圾短信全部放回收件箱，`spam: null`，未读状态保持原样，并从此信任这个号码（见上）。`POST /v1/spam/purge` 永久删除。两者的 `{ "peers" }` 和回收站一样（空为 `400`；超过 500 只处理前 500 个）。垃圾短信满 30 天后可以清除。每个都发带 `spam` 的 `conversations`；恢复可能使 `badge` 变化。
+
+**举报。** `POST /v1/spam/report`（`{ "peers": [...], "then": "trash" | "purge" }`）表示用户认为收件箱里的某个会话是漏网的垃圾短信。后端把其中收到的短信作为垃圾短信样本保存（见下），然后把会话移入回收站（`then: "trash"`，需要 `trash`）或永久删除（`"purge"`，或没有 `trash` 时），并把每个号码加入黑名单，此后它的来电被拒接、短信归入垃圾短信。事件与删除会话相同，黑名单有变化时再发 `blocklist`。
+
+**黑名单。** `GET /v1/blocklist` 回 `{ "numbers": [{ "number", "addedAt" }] }`，新的在前。`POST /v1/blocklist`（`{ "number" }`）添加一个：按“号码”一节的号码（去掉分组后 3–20 位数字，可带 `+`），或发送方名称，如 `Bank-OTP`（1–20 个字母、数字、空格、`-` 或 `_`）；其他回 `400`，指明 `"number"`。添加已有的回 `200`。`DELETE /v1/blocklist/{number}`（URL 编码）移除——本来没有也回 `200`。号码匹配它的所有写法（“号码”：同一个人就是同一个 peer）；发送方名称不分大小写精确匹配。每次变化都发带 rev 的 `blocklist`（整个列表）；快照也带 `blocklist`。
+
+黑名单发送方的短信是 `spam`，理由 `blocked`。黑名单号码的来电在任何人被呼叫之前就被拒接：没有 `call` 事件、没有 `notify`、没有 VoIP 推送；后端一知道号码就挂断，并记为 `outcome: "blocked"`、`seen: true`（“通话记录”）。隐藏号码无法拉黑。
+
+**手机会被告知什么。** 垃圾短信和被拦截的来电都不会像正常消息那样提醒：没有 `notify`、没有声音、不会弹横幅打断用户。后端每件发一条静默的普通推送（类别 `spam`，见“推送”），说明拦下了什么、来自谁、为什么，用户想看时可以去看。它不计入角标。
+
+**判断所学习的样本。** 后端保存自己的样本；什么都不会发到别处。每个样本是一行 JSON——`cellpilotd` 导出的就是这样，自己训练模型的后端也应该收集这些：
+
+```json
+{ "text": "…", "label": "spam", "source": "report", "peer": "+8613812345678", "at": "2026-10-10T08:00:00.000Z" }
+```
+
+| `source` | `label` | 何时 |
+| --- | --- | --- |
+| `report` | `spam` | 用户举报了会话；其中每条收到的短信一个样本。 |
+| `restore` | `ham` | 用户把这个号码的短信移出垃圾短信；每条一个，不论原来因为什么进去。 |
+| `blocked` | `spam` | 黑名单发送方的短信。 |
+| `keyword` | `spam` | 强条目放进垃圾短信、30 天内没有被移出的短信。 |
+| `kept` | `ham` | 用户认识的人或短号发来、在收件箱里放了一周、没有标记也没被举报的短信：这条线路平时收到的东西。 |
+
+`peer` 可选；任何要离开本机的东西都不要带它。后端至少应保留最近 5,000 个，可以丢弃最旧的。`cellpilotd` 把它们存在数据库里，通过 `GET /console/spam/examples`（管理员 token，只限本机）以 JSON 行输出。
 
 ## 号码
 
@@ -429,9 +503,9 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 有 `snapshot` 特性时，`rev` 是客户端所保存的一切的版本：后端这次运行的编号、一个点、一个计数器。短信、会话、通话、联系人、留言、告警、功能或设置每变一次，计数器加一。带着这类变化的事件都附上新的 `rev`；没有事件承载的变化（设置）单独以 `{ "type": "rev", "rev" }` 送达。客户端手上的状态版本和 `hello` 一样就什么都不用拉。否则（运行编号不同、计数器跳了不止一步、或收到单独的 `rev` 事件）就请求一次 `GET /v1/snapshot`：一个请求拿到全部列表、设置、告警、自身记录（`client`，含 `pushTokens`）、推送状态和角标，都在同一个 `rev`。这是 App 唯一的刷新方式，没有轮询。
 
-推进 `rev` 的变化，以及带新 `rev` 的事件：短信被记下或状态变化（`message`）；会话列表或回收站（`conversations`）；通话记录（`calls`）；联系人（`contacts`）；留言列表（`voicemails`）；检查结果或告警（`security`）；特性列表（`features`）；设置、推送 `problem` 的变化（单独的 `rev`）。别的都不推进：`status`、`call`、`audio`、录音中的 `voicemail`、`log`、`badge`、`client`、`notify`，登记推送 token，以及在中转登记（发起登记的 App 已有响应）——除非这次登记清掉了推送 `problem`，那算这个 problem 的变化。`PATCH /v1/settings` 请求体里每有一个 `voicemail` 或 `transcription` 对象就推进一步（各发一个 `features` 事件，列表没变也发），再用单独的 `rev` 推进一步（见“设置”）。快照里的 `calls` 是最新的 100 条。背后的规则：`rev` 是所有客户端共用的一个计数，每一步都必须到达每个连接——只发给一个客户端的事件不能推进它，否则别的客户端会看到跳号，白白读一次快照。
+推进 `rev` 的变化，以及带新 `rev` 的事件：短信被记下或状态变化（`message`）；会话列表、回收站或垃圾短信文件夹（`conversations`）；通话记录（`calls`）；联系人（`contacts`）；黑名单（`blocklist`）；留言列表（`voicemails`）；检查结果或告警（`security`）；特性列表（`features`）；设置、推送 `problem` 的变化（单独的 `rev`）。别的都不推进：`status`、`call`、`audio`、录音中的 `voicemail`、`log`、`badge`、`client`、`notify`，登记推送 token，以及在中转登记（发起登记的 App 已有响应）——除非这次登记清掉了推送 `problem`，那算这个 problem 的变化。`PATCH /v1/settings` 请求体里每有一个 `voicemail` 或 `transcription` 对象就推进一步（各发一个 `features` 事件，列表没变也发），再用单独的 `rev` 推进一步（见“设置”）。快照里的 `calls` 是最新的 100 条。背后的规则：`rev` 是所有客户端共用的一个计数，每一步都必须到达每个连接——只发给一个客户端的事件不能推进它，否则别的客户端会看到跳号，白白读一次快照。
 
-没有 `snapshot` 的后端不带 `rev`。App 就在每次连上时重新读一遍，每个列表一个请求（`/status`、`/conversations`、`/calls`，按声明再读 `/trash`、`/contacts`、`/voicemails`、`/settings`、`/security`，最后 `/client`），之后的事件来一个用一个。这样总是对的，只是慢一些。
+没有 `snapshot` 的后端不带 `rev`。App 就在每次连上时重新读一遍，每个列表一个请求（`/status`、`/conversations`、`/calls`，按声明再读 `/trash`、`/spam`、`/blocklist`、`/contacts`、`/voicemails`、`/settings`、`/security`，最后 `/client`），之后的事件来一个用一个。这样总是对的，只是慢一些。
 
 之后每发生一件事发一个 JSON 文本帧：
 
@@ -441,7 +515,8 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | `call` | `call`、`holder` | 通话或 holder 变了。每次状态迁移都发，包括变成 `null`。 |
 | `audio` | `active` | 后端开始（`true`：这通电话的声音通路已就绪，可以早于接通）或停止和 holder 交换音频帧。App 收到 `true` 才打开麦克风和扬声器。 |
 | `message` | `message` | 收到短信（长短信每段一次）、发出的短信被记下、或它的状态变了。 |
-| `conversations` | `conversations`、`trash`? | 会话列表变了（新短信、已读、删除、恢复）。 |
+| `conversations` | `conversations`、`trash`?、`spam`? | 会话列表变了（新短信、已读、删除、恢复、收到垃圾短信或移出）。有 `trash` 时带 `trash`，有 `spam` 时带 `spam`。 |
+| `blocklist` | `numbers` | 黑名单变了（需要 `spam`）；整个列表，和 `GET /v1/blocklist` 一样。 |
 | `contacts` | `contacts` | 联系人列表变了。 |
 | `calls` | `calls` | 通话记录变了；带最新一页（见“通话记录”）。 |
 | `voicemail` | `peer`、`reason`: `no-answer`\|`declined`、`recording`、`transcript`、`delta`? | 答录机正在录音（`recording: true`，`transcript` 是到目前为止的全文，`delta` 是新增部分）或录完了；见“答录机”。 |
@@ -451,7 +526,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | `features` | `features` | 后端能做的事变了；与 `GET /v1` 的列表相同。 |
 | `log` | `event` | 一条日志，有 `log` 特性时。 |
 | `rev` | `rev` | 客户端保存的某样东西变了但没有事件承载（设置）：请求一次 snapshot。 |
-| `badge` | `badge` | App 图标角标数变了：不在回收站的收到未读短信 + `seen: false` 的记录 + 未听留言 + 未确认告警。 |
+| `badge` | `badge` | App 图标角标数变了：不在回收站和垃圾短信里的收到未读短信 + `seen: false` 的记录 + 未听留言 + 未确认告警。 |
 | `notify` | `id`、`kind`、`callId`?、`reason`? | 可能需要通知的事；只发给一个客户端的连接，它用 `ack` 回复（见下）。 |
 
 未知类型必须忽略，所以后端可以加自己的。哪件事发哪些事件、问哪种 notify、推哪种推送，见“从发生的事到事件和推送”那一张表。
@@ -496,6 +571,9 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 | 发生的事 | 事件（发给每个连接） | `notify` kind（等待） | 推送 | 排除 |
 | --- | --- | --- | --- | --- |
 | 收到短信（长短信：收齐时） | `message` rev（每段也发，每段都可能使 `badge` 变化）、`conversations` rev、`badge` | `sms`（5 秒） | alert `sms`，`sms-<id>` | — |
+| 收到垃圾短信（有 `spam` 时） | `message` rev、`conversations` rev | — | 静默 alert `spam`，`spam-<id>` | — |
+| 黑名单号码来电（有 `spam` 时） | 记录结束时 `calls` rev | — | 静默 alert `spam`，`call-<id>` | — |
+| 黑名单变了 | `blocklist` rev | — | — | — |
 | 发出的短信被记下 | `message` rev（`pending`） | — | — | — |
 | 发出或失败 | `message` rev、`conversations` rev | — | — | — |
 | 来电开始响铃（知道号码或满 2 秒） | `call` | `call`（1.5 秒），没有 VoIP token 的客户端 | 有 VoIP token 的立即 VoIP；其余不在前台的 alert `call`，`call-<id>` | — |
@@ -546,7 +624,7 @@ key = HKDF-SHA256(ikm = SHA-256(token), salt = "cellpilot", info = "push-v1", le
   "e": "…", "v": 1 }
 ```
 
-明文只说来了哪一类东西；App 的通知扩展用封起来的内容替换它：`{ "title", "body", "category", …data }`，用客户端的语言，`category` 与 `aps.category` 相同。只有这五个类别，App 按类别和字段名决定点开后去哪：
+明文只说来了哪一类东西；App 的通知扩展用封起来的内容替换它：`{ "title", "body", "category", …data }`，用客户端的语言，`category` 与 `aps.category` 相同。只有这六个类别，App 按类别和字段名决定点开后去哪：
 
 | 事 | `category` | 封装的 `title` / `body` | 封装的数据 | collapse id | `interruption-level` | `sound` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -555,10 +633,11 @@ key = HKDF-SHA256(ikm = SHA-256(token), salt = "cellpilot", info = "push-v1", le
 | 未接来电 | `missed-call` | 来电者 / “未接来电”（答录机接了但没有留言：“未接来电 · 未留言”） | `number`、`callId` | `call-<id>` | `active` | `default` |
 | 留言 | `voicemail` | 来电者 / 如“未接来电 · 有留言 18 秒” | `voicemailId`、`number`、`callId` | `call-<id>`（没有记录时 `voicemail-<id>`） | `active` | `default` |
 | 安全告警 | `security` | “安全告警：”加告警标题 / 详情第一行 | `alertId` | `alert-<id>` | `time-sensitive` | `default` |
+| 拦下的垃圾短信或黑名单来电（有 `spam` 时） | `spam` | 发送方的名字或号码 / 拦下了什么、为什么，如“已拦截垃圾短信 · 诈骗话术”“已拦截来电 · 在你的黑名单中”——绝不包含短信内容 | `peer`、`messageId` 或 `callId`、`reason` | `spam-<id>` 或 `call-<id>` | `passive` | 无（没有 `sound` 键） |
 
 `mutable-content: 1` 必须有：通知扩展靠它打开 `e`。中转只转发恰好由 `aps`、`e`、`v` 组成的 alert：`aps.alert.title` 为 `"CellPilot"`，`aps.alert.body` 是不超过 40 个字符的字符串（措辞随意——`cellpilotd` 用 `New message`、`Incoming call`、`Missed call`、`New voicemail`、`Security alert`，或 新消息、来电、未接来电、新留言、安全告警），`aps` 里只能有 `alert`、`sound`、`category`、`interruption-level`、`mutable-content`、`thread-id` 和 `badge`（0–99999 的整数），`e` 长 16–4000 个字符。`aps` 里的一切都是明文：通知正文和 `thread-id` 里不要放能认出人或引用短信的内容。
 
-除来电那条之外，每条普通推送都在 `aps.badge` 带上图标角标数：不在回收站的收到未读短信 + `seen: false` 的记录 + 未听留言 + 未确认告警，与 `hello`、`badge` 事件、快照的 `badge` 是同一个数。在一个客户端上看完后，没有存活连接的客户端会收到只有 `{ "aps": { "badge": n } }` 的推送——不封装、不显示、不带 collapse id；iOS 只能从明文读角标。300 毫秒内的变化只发一次（`badge` 事件也一样），而且只在这个数和上次发出的不同时才发——整个后端只有一个数，发给任何客户端的任何推送或 `badge` 事件都会更新它，后端启动时以当时的数为起点。
+除来电那条之外，每条普通推送都在 `aps.badge` 带上图标角标数：不在回收站和垃圾短信里的收到未读短信 + `seen: false` 的记录 + 未听留言 + 未确认告警，与 `hello`、`badge` 事件、快照的 `badge` 是同一个数。在一个客户端上看完后，没有存活连接的客户端会收到只有 `{ "aps": { "badge": n } }` 的推送——不封装、不显示、不带 collapse id；iOS 只能从明文读角标。300 毫秒内的变化只发一次（`badge` 事件也一样），而且只在这个数和上次发出的不同时才发——整个后端只有一个数，发给任何客户端的任何推送或 `badge` 事件都会更新它，后端启动时以当时的数为起点。
 
 **VoIP 推送**通过 CallKit 让手机为来电响铃，一知道号码就发（两秒还没有号码就当隐藏号码发）。它恰好只有 `e` 和 `v`，没有 `aps`，封着 `{ "callId", "number", "name", "place": { "en", "zh" } }`：隐藏号码时 `number` 为 `null`，`name` 是联系人显示名或 `null`，`place` 总是对象，每种语言不知道时为 `null`（没有 `places` 时两个都是）。只能为真正在响铃的来电发送——iOS 要求 App 对每条 VoIP 推送都报告一通来电——中转以过期时间 0 发送它，Apple 会立即尝试投递，送不到就丢弃而不会延迟送达；不保证一定送达。收到它的客户端这通电话不再收 `call` 普通推送，也不被 `notify` 询问。来电停止响铃时，没有确认 `call-end`（见“在线状态与 `notify`”）的客户端会再收到一条，封着 `{ "type": "end", "callId", "reason" }`；App 上报后立即结束。没有 `type`，App 会把它当成一通新来电。
 
@@ -656,6 +735,7 @@ node tools/api-check.mjs --url http://127.0.0.1:8799 --token <token> --write --t
 | `POST /_sim/call` | `{ "from" }`（`null`：隐藏号码） | 来电响铃。 |
 | `POST /_sim/hangup` | `{}` | 对方挂断；还在响铃的来电因此成为未接。 |
 | `POST /_sim/answer` | `{}` | 对方接听拨出的电话。可选：模拟器可以自己接听。 |
+| `GET /_sim/state` | | 可选：对方收到了什么——`{ call, sent: [{ to, text, at }], dtmf: [] }`——测试可以借此确认一条短信确实发了出去，或确实被拦下。 |
 
 每个都回 `200 {}`，不合时宜时（已经有通话）回 `409`。
 

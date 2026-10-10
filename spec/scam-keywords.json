@@ -1,0 +1,1799 @@
+{
+ "about": "CellPilot scam-wording list. A text is NFKC-normalised and lowercased; an entry matches when every one of its terms is a substring, tried on the text as it is and again with spaces, punctuation, symbols and emoji removed. A 'medium' entry does not match when the text contains a warning marker (an anti-fraud warning quoting scam wording); a 'strong' entry does not either when the sender is an official one (an SMS gateway, a short code or a sender name), and always does from a personal number. Strong: outbound asks and counts a strike, inbound files the text as spam. Medium: outbound asks without a strike, inbound marks the text but leaves it in the inbox. Tuned for precision; see the specification.",
+ "version": 2,
+ "updated": "2026-10-10",
+ "markers": [
+  "都是诈骗",
+  "均为诈骗",
+  "就是诈骗",
+  "均是诈骗",
+  "是诈骗",
+  "是骗局",
+  "都是骗局",
+  "谨防",
+  "警惕",
+  "切勿转账",
+  "切勿相信",
+  "切勿点击",
+  "切勿泄露",
+  "骗子冒充",
+  "不法分子",
+  "冒充",
+  "不要轻信",
+  "请勿相信",
+  "不会要求",
+  "不会以",
+  "不会通过",
+  "不会向",
+  "不会主动",
+  "反诈",
+  "96110",
+  "防骗",
+  "提高警惕",
+  "凡是",
+  "will never",
+  "never ask",
+  "scam warning",
+  "be wary",
+  "beware of",
+  "is a scam",
+  "are scams",
+  "fraud alert: we",
+  "watch out for",
+  "scamwatch",
+  "反詐",
+  "防騙",
+  "謹防",
+  "切勿轉賬",
+  "切勿轉帳",
+  "不會以",
+  "不會要求",
+  "不會透過",
+  "不會主動",
+  "騙案",
+  "是詐騙",
+  "都是詐騙",
+  "均為詐騙",
+  "常見詐騙",
+  "常见诈骗",
+  "詐騙手法",
+  "诈骗手法",
+  "标记为诈骗",
+  "標記為詐騙",
+  "请立即挂断",
+  "請立即掛斷",
+  "18222",
+  "反电信网络诈骗法",
+  "it's a scam",
+  "probably a scam",
+  "a scam text",
+  "165反詐騙"
+ ],
+ "entries": [
+  {
+   "id": "zh-safe-account-funds",
+   "terms": [
+    "安全账户",
+    "资金"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-national-safe-account",
+   "terms": [
+    "国家安全账户"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-money-laundering-cooperate",
+   "terms": [
+    "涉嫌洗钱",
+    "配合调查"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-fund-clearance",
+   "terms": [
+    "资金清查"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-name-account-laundering",
+   "terms": [
+    "名下",
+    "涉嫌",
+    "洗钱"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-arrest-warrant-name",
+   "terms": [
+    "通缉令",
+    "名下"
+   ],
+   "strength": "strong",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-secret-case-no-tell",
+   "terms": [
+    "案件",
+    "保密",
+    "不要告诉"
+   ],
+   "strength": "strong",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-asset-freeze-case",
+   "terms": [
+    "涉案",
+    "冻结",
+    "转入"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-safe-account",
+   "terms": [
+    "安全帳戶"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-supervised-account",
+   "terms": [
+    "監管帳戶"
+   ],
+   "strength": "strong",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-laundering-cooperate",
+   "terms": [
+    "涉嫌洗錢",
+    "配合調查"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-mainland-police",
+   "terms": [
+    "內地公安",
+    "涉嫌"
+   ],
+   "strength": "strong",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-black-money",
+   "terms": [
+    "洗黑錢",
+    "調查",
+    "帳戶"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-million-protection-fee",
+   "terms": [
+    "百万保障",
+    "扣费"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-million-protection-close",
+   "terms": [
+    "百万保障",
+    "关闭"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-refund-reserve-fund",
+   "terms": [
+    "退款",
+    "备用金"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-claim-reserve-fund",
+   "terms": [
+    "理赔",
+    "备用金"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-refund-jiebei",
+   "terms": [
+    "退款",
+    "借呗"
+   ],
+   "strength": "strong",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-lost-parcel-triple",
+   "terms": [
+    "快递",
+    "丢失",
+    "赔偿"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-double-compensation-quality",
+   "terms": [
+    "质量问题",
+    "双倍赔偿"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-mistaken-vip",
+   "terms": [
+    "误开通",
+    "会员"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-agent-cancel",
+   "terms": [
+    "代理商",
+    "影响征信"
+   ],
+   "strength": "strong",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-refund-add-wechat",
+   "terms": [
+    "退款",
+    "加微信"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-refund-qq",
+   "terms": [
+    "退款",
+    "加qq"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-flight-cancel-compensation",
+   "terms": [
+    "航班",
+    "取消",
+    "补偿",
+    "客服"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-cancel-installment",
+   "terms": [
+    "解除分期"
+   ],
+   "strength": "strong",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-duplicate-charge",
+   "terms": [
+    "重複扣款",
+    "解除"
+   ],
+   "strength": "strong",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-mistaken-vip",
+   "terms": [
+    "誤設",
+    "會員"
+   ],
+   "strength": "strong",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-not-close-credit",
+   "terms": [
+    "不关闭",
+    "影响征信"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-summons-unsigned",
+   "terms": [
+    "传票",
+    "未签收"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-parcel-claim",
+   "terms": [
+    "速遞",
+    "理賠"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-brush-commission",
+   "terms": [
+    "刷单",
+    "佣金"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-brush-rebate",
+   "terms": [
+    "刷单",
+    "返利"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-like-daily-pay",
+   "terms": [
+    "点赞",
+    "日结"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-like-commission",
+   "terms": [
+    "点赞",
+    "佣金"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-task-commission",
+   "terms": [
+    "做任务",
+    "佣金"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-task-advance",
+   "terms": [
+    "垫付",
+    "任务"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-mom-part-time",
+   "terms": [
+    "宝妈",
+    "兼职"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-daily-earn-part-time",
+   "terms": [
+    "日赚",
+    "兼职"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-typist-part-time",
+   "terms": [
+    "打字员",
+    "兼职"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-stuck-order",
+   "terms": [
+    "卡单",
+    "充值"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-like-daily",
+   "terms": [
+    "按讚",
+    "日結"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-brush",
+   "terms": [
+    "刷單",
+    "佣金"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-blacklist-loan",
+   "terms": [
+    "黑户",
+    "贷"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-no-credit-check",
+   "terms": [
+    "不看征信"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-credit-repair",
+   "terms": [
+    "征信修复"
+   ],
+   "strength": "medium",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-credit-whitewash",
+   "terms": [
+    "征信",
+    "洗白"
+   ],
+   "strength": "medium",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-cancel-campus-loan",
+   "terms": [
+    "注销",
+    "校园贷"
+   ],
+   "strength": "medium",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-student-account-credit",
+   "terms": [
+    "学生账户",
+    "征信"
+   ],
+   "strength": "medium",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-unfreeze-fee",
+   "terms": [
+    "解冻金"
+   ],
+   "strength": "medium",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-loan-deposit",
+   "terms": [
+    "下款",
+    "保证金"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-guaranteed-payout",
+   "terms": [
+    "包下款"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-wrong-card-loan",
+   "terms": [
+    "卡号",
+    "错误",
+    "贷款",
+    "冻结"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-loan-flow",
+   "terms": [
+    "刷流水",
+    "放款"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-loan-no-review",
+   "terms": [
+    "免審核",
+    "貸款"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-teacher-signal",
+   "terms": [
+    "老师",
+    "带单"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-mentor-stock-group",
+   "terms": [
+    "股票",
+    "内幕",
+    "群"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-limit-up-group",
+   "terms": [
+    "涨停",
+    "加群"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-guaranteed-no-loss",
+   "terms": [
+    "稳赚不赔"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-principal-high-yield",
+   "terms": [
+    "保本",
+    "高收益",
+    "加"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-crypto-sure-win",
+   "terms": [
+    "数字货币",
+    "稳赚"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-usdt-yield",
+   "terms": [
+    "usdt",
+    "收益"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-teacher-signal",
+   "terms": [
+    "老師",
+    "帶單"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-guaranteed-profit",
+   "terms": [
+    "保證獲利"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-hot-stock-line",
+   "terms": [
+    "飆股",
+    "line"
+   ],
+   "strength": "strong",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-prize-fee",
+   "terms": [
+    "中奖",
+    "手续费"
+   ],
+   "strength": "strong",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-prize-tax",
+   "terms": [
+    "中奖",
+    "个人所得税"
+   ],
+   "strength": "medium",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-prize-deposit",
+   "terms": [
+    "中奖",
+    "保证金"
+   ],
+   "strength": "strong",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-tv-show-prize",
+   "terms": [
+    "节目组",
+    "奖金"
+   ],
+   "strength": "strong",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-offsite-prize",
+   "terms": [
+    "场外",
+    "幸运观众"
+   ],
+   "strength": "strong",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-prize-fee",
+   "terms": [
+    "中獎",
+    "手續費"
+   ],
+   "strength": "strong",
+   "category": "prize",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-etc-auth-invalid",
+   "terms": [
+    "etc",
+    "认证失效"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-etc-reauth",
+   "terms": [
+    "etc",
+    "重新认证"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-etc-expired-verify",
+   "terms": [
+    "etc",
+    "过期",
+    "验证"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-etc-disabled-link",
+   "terms": [
+    "etc",
+    "停用",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-medical-card-frozen",
+   "terms": [
+    "医保卡",
+    "冻结"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-medical-card-misuse",
+   "terms": [
+    "医保卡",
+    "异地",
+    "盗刷"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-tax-subsidy",
+   "terms": [
+    "个税补贴"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-refund-tax-link",
+   "terms": [
+    "退税",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-labour-subsidy",
+   "terms": [
+    "劳动补贴",
+    "领取"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-ecny-wallet-rebind",
+   "terms": [
+    "数字人民币",
+    "异常",
+    "绑定"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-alipay-student-upgrade",
+   "terms": [
+    "学生账户",
+    "升级"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-usb-key-expired",
+   "terms": [
+    "电子密码器",
+    "过期"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-ukey-expired",
+   "terms": [
+    "u盾",
+    "过期"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-traffic-fine-link",
+   "terms": [
+    "违章",
+    "未处理",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-traffic-fine",
+   "terms": [
+    "罰單",
+    "逾期",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-tax-unpaid-link",
+   "terms": [
+    "未繳清",
+    "稅款",
+    "登入"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-bank-abnormal-login",
+   "terms": [
+    "帳戶",
+    "異常交易",
+    "立即登入"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-customs-seized-fee",
+   "terms": [
+    "海关",
+    "扣押",
+    "缴纳"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-parcel-address-link",
+   "terms": [
+    "地址不详",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "zh"
+  },
+  {
+   "id": "hk-address-incomplete",
+   "terms": [
+    "地址不完整",
+    "無法派送"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-send-me-code",
+   "terms": [
+    "验证码",
+    "发给我"
+   ],
+   "strength": "medium",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-code-screenshot",
+   "terms": [
+    "验证码",
+    "截图"
+   ],
+   "strength": "medium",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-screen-share-meeting",
+   "terms": [
+    "屏幕共享",
+    "会议"
+   ],
+   "strength": "medium",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-share-screen-refund",
+   "terms": [
+    "共享屏幕",
+    "退"
+   ],
+   "strength": "medium",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-screen-share-bank",
+   "terms": [
+    "屏幕共享",
+    "银行"
+   ],
+   "strength": "medium",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-remote-assist-refund",
+   "terms": [
+    "远程协助",
+    "退款"
+   ],
+   "strength": "strong",
+   "category": "code-or-screenshare",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-leader-office",
+   "terms": [
+    "明天",
+    "来我办公室"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-leader-office2",
+   "terms": [
+    "明天到我办公室"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-guess-who",
+   "terms": [
+    "猜猜我是谁"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-changed-number-save",
+   "terms": [
+    "换号",
+    "惠存"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-leader-busy-transfer",
+   "terms": [
+    "不方便",
+    "转账",
+    "领导"
+   ],
+   "strength": "strong",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-local-service",
+   "terms": [
+    "同城",
+    "上门服务"
+   ],
+   "strength": "medium",
+   "category": "romance-adult",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-baccarat",
+   "terms": [
+    "百家乐"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-register-bonus",
+   "terms": [
+    "注册送",
+    "彩金"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-online-casino",
+   "terms": [
+    "线上",
+    "娱乐城"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-macau-casino",
+   "terms": [
+    "澳门",
+    "葡京"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-casino",
+   "terms": [
+    "娛樂城"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "tw-baccarat",
+   "terms": [
+    "百家樂"
+   ],
+   "strength": "strong",
+   "category": "gambling",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-points-to-cash",
+   "terms": [
+    "积分",
+    "兑换现金"
+   ],
+   "strength": "medium",
+   "category": "carrier-points",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-points-tomorrow-void",
+   "terms": [
+    "积分",
+    "明日作废"
+   ],
+   "strength": "strong",
+   "category": "carrier-points",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-points-link",
+   "terms": [
+    "积分",
+    "兑换",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "carrier-points",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-weixin-homophone",
+   "terms": [
+    "薇信"
+   ],
+   "strength": "medium",
+   "category": "contact-dodge",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-v-xin",
+   "terms": [
+    "v信"
+   ],
+   "strength": "medium",
+   "category": "contact-dodge",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-vx-part-time",
+   "terms": [
+    "vx",
+    "兼职"
+   ],
+   "strength": "strong",
+   "category": "contact-dodge",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-koukou",
+   "terms": [
+    "加扣扣"
+   ],
+   "strength": "medium",
+   "category": "contact-dodge",
+   "lang": "zh"
+  },
+  {
+   "id": "en-unpaid-toll",
+   "terms": [
+    "unpaid toll"
+   ],
+   "strength": "medium",
+   "category": "toll",
+   "lang": "en"
+  },
+  {
+   "id": "en-outstanding-toll",
+   "terms": [
+    "outstanding toll"
+   ],
+   "strength": "medium",
+   "category": "toll",
+   "lang": "en"
+  },
+  {
+   "id": "en-toll-pay-now-link",
+   "terms": [
+    "toll",
+    "avoid",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "toll",
+   "lang": "en"
+  },
+  {
+   "id": "en-linkt-unpaid",
+   "terms": [
+    "linkt",
+    "unpaid"
+   ],
+   "strength": "medium",
+   "category": "toll",
+   "lang": "en"
+  },
+  {
+   "id": "en-redelivery-fee",
+   "terms": [
+    "redelivery fee"
+   ],
+   "strength": "strong",
+   "category": "delivery-customs",
+   "lang": "en"
+  },
+  {
+   "id": "en-incomplete-address",
+   "terms": [
+    "incomplete address",
+    "package"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "en"
+  },
+  {
+   "id": "en-unable-deliver-link",
+   "terms": [
+    "unable to deliver",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "en"
+  },
+  {
+   "id": "en-customs-fee-link",
+   "terms": [
+    "customs fee",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "en"
+  },
+  {
+   "id": "en-hi-mom-new-number",
+   "terms": [
+    "hi mom",
+    "new number"
+   ],
+   "strength": "strong",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-dropped-phone",
+   "terms": [
+    "dropped my phone",
+    "new number"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-buy-gift-cards",
+   "terms": [
+    "gift cards",
+    "for me"
+   ],
+   "strength": "medium",
+   "category": "gift-cards",
+   "lang": "en"
+  },
+  {
+   "id": "en-gift-card-codes",
+   "terms": [
+    "gift card",
+    "send",
+    "code"
+   ],
+   "strength": "medium",
+   "category": "gift-cards",
+   "lang": "en"
+  },
+  {
+   "id": "en-gift-card-scratch",
+   "terms": [
+    "scratch",
+    "gift card"
+   ],
+   "strength": "strong",
+   "category": "gift-cards",
+   "lang": "en"
+  },
+  {
+   "id": "en-hmrc-refund",
+   "terms": [
+    "hmrc",
+    "refund"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-irs-refund-link",
+   "terms": [
+    "irs",
+    "refund",
+    "http"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-ato-refund-link",
+   "terms": [
+    "ato",
+    "refund",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-mygov-link",
+   "terms": [
+    "mygov",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-dvla-tax-failed",
+   "terms": [
+    "dvla",
+    "payment",
+    "failed"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-dvla-refund",
+   "terms": [
+    "dvla",
+    "refund"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-ssn-suspended",
+   "terms": [
+    "social security number",
+    "suspended"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-arrest-warrant",
+   "terms": [
+    "warrant",
+    "arrest"
+   ],
+   "strength": "strong",
+   "category": "institution-impersonation",
+   "lang": "en"
+  },
+  {
+   "id": "en-account-suspended-click",
+   "terms": [
+    "account",
+    "suspended",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "phishing-account",
+   "lang": "en"
+  },
+  {
+   "id": "en-account-locked-verify",
+   "terms": [
+    "locked",
+    "verify",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "phishing-account",
+   "lang": "en"
+  },
+  {
+   "id": "en-apple-id-locked",
+   "terms": [
+    "apple id",
+    "locked"
+   ],
+   "strength": "medium",
+   "category": "phishing-account",
+   "lang": "en"
+  },
+  {
+   "id": "en-confirm-details-avoid-suspension",
+   "terms": [
+    "confirm your details",
+    "suspension"
+   ],
+   "strength": "strong",
+   "category": "phishing-account",
+   "lang": "en"
+  },
+  {
+   "id": "en-code-by-mistake",
+   "terms": [
+    "code",
+    "your number by mistake"
+   ],
+   "strength": "strong",
+   "category": "code-or-screenshare",
+   "lang": "en"
+  },
+  {
+   "id": "en-code-send-back",
+   "terms": [
+    "code",
+    "send it back"
+   ],
+   "strength": "strong",
+   "category": "code-or-screenshare",
+   "lang": "en"
+  },
+  {
+   "id": "en-remote-job-whatsapp",
+   "terms": [
+    "per day",
+    "whatsapp",
+    "job"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "en"
+  },
+  {
+   "id": "en-like-videos-earn",
+   "terms": [
+    "like",
+    "videos",
+    "earn"
+   ],
+   "strength": "strong",
+   "category": "task-scam",
+   "lang": "en"
+  },
+  {
+   "id": "en-guaranteed-returns",
+   "terms": [
+    "guaranteed returns"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "en"
+  },
+  {
+   "id": "en-crypto-mentor",
+   "terms": [
+    "crypto",
+    "mentor"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "en"
+  },
+  {
+   "id": "en-won-claim-prize",
+   "terms": [
+    "you have won",
+    "claim"
+   ],
+   "strength": "medium",
+   "category": "prize",
+   "lang": "en"
+  },
+  {
+   "id": "en-won-claim-prize2",
+   "terms": [
+    "you've won",
+    "claim"
+   ],
+   "strength": "medium",
+   "category": "prize",
+   "lang": "en"
+  },
+  {
+   "id": "en-new-number-whatsapp",
+   "terms": [
+    "new number",
+    "whatsapp"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-new-number-favour",
+   "terms": [
+    "new number",
+    "favour"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-new-number-favor",
+   "terms": [
+    "new number",
+    "favor"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-new-number-pay",
+   "terms": [
+    "new number",
+    "pay"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "en-new-number-send",
+   "terms": [
+    "new number",
+    "send $"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "en"
+  },
+  {
+   "id": "zh-arrest-warrant-contact",
+   "terms": [
+    "逮捕令",
+    "联系"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-cross-border-laundering",
+   "terms": [
+    "跨境洗钱"
+   ],
+   "strength": "medium",
+   "category": "police-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-medical-protection-fee",
+   "terms": [
+    "百万医疗",
+    "扣费"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-triple-compensation",
+   "terms": [
+    "三倍赔偿"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-rebook-fee-card",
+   "terms": [
+    "改签",
+    "手续费",
+    "银行卡"
+   ],
+   "strength": "medium",
+   "category": "customer-service-refund",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-verify-funds-transfer",
+   "terms": [
+    "验资",
+    "转入"
+   ],
+   "strength": "strong",
+   "category": "loan-credit",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-crypto-double",
+   "terms": [
+    "虚拟币",
+    "翻倍"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-coin-trading-guaranteed",
+   "terms": [
+    "炒币",
+    "稳赚"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-wage-subsidy-claim",
+   "terms": [
+    "工资补贴",
+    "申领"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-social-security-link",
+   "terms": [
+    "社保",
+    "冻结",
+    "http"
+   ],
+   "strength": "medium",
+   "category": "institution-impersonation",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-customs-smuggling",
+   "terms": [
+    "海关",
+    "走私"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-transfer-to-this-account",
+   "terms": [
+    "帮我转",
+    "这个账户"
+   ],
+   "strength": "medium",
+   "category": "relative-leader",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-local-dating",
+   "terms": [
+    "同城交友"
+   ],
+   "strength": "strong",
+   "category": "romance-adult",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-lonely-beauty",
+   "terms": [
+    "寂寞",
+    "美女"
+   ],
+   "strength": "strong",
+   "category": "romance-adult",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-gold-invest-together",
+   "terms": [
+    "黄金投资",
+    "带你"
+   ],
+   "strength": "medium",
+   "category": "investment",
+   "lang": "zh"
+  },
+  {
+   "id": "en-incomplete-address",
+   "terms": [
+    "incomplete address"
+   ],
+   "strength": "medium",
+   "category": "delivery-customs",
+   "lang": "en"
+  },
+  {
+   "id": "zh-follow-streamer-rebate",
+   "terms": [
+    "关注",
+    "返佣"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  },
+  {
+   "id": "zh-like-daily-pay-dodge",
+   "terms": [
+    "点赞",
+    "日结"
+   ],
+   "strength": "medium",
+   "category": "task-scam",
+   "lang": "zh"
+  }
+ ]
+}

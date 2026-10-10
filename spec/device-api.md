@@ -47,37 +47,52 @@ rotation. Use of CellPilot is subject to the [acceptable use policy](../ACCEPTAB
 
 ### Outbound limits
 
-The app limits what the user can call and text, whatever the backend; a backend should apply the
-same limits to `POST /v1/call/dial` and `POST /v1/messages`, so the API used directly is held to
-them too. `cellpilotd` does. A number is one of four kinds, judged at the moment of sending:
+The app limits what the user can call and text, whatever the backend, and judges only by what it
+has seen itself; a backend should apply the same limits to `POST /v1/call/dial` and
+`POST /v1/messages`, so the API used directly is held to them too. `cellpilotd` does. A number is
+one of four kinds, judged at the moment of sending:
 
 | Kind | What it is |
 | --- | --- |
 | emergency | `110`, `112`, `119`, `120`, `122`, `911`, `999`, `000`, `995`, without `+`. Never limited. |
-| familiar | A contact, or a number that has called or texted this line (*Contacts* matching rule). |
+| familiar | A contact, or a number that has called or texted this line (*Contacts* matching rule), known for at least **3 days**: since the contact was made or the first call or text from it. The app counts from when it first saw the number, and lets at most 5 numbers become familiar a day. |
 | hotline | A short code (3–6 digits), a toll-free, shared-cost or premium number, or a gateway sender (*Numbers*). |
 | stranger | Anything else. |
 
-Within any 24 hours:
+The rules (`details.rule`), over the last 24 hours unless a rule says otherwise:
 
-| Rule (`details.rule`) | Limit |
-| --- | --- |
-| `stranger-calls` | Calls to 3 distinct strangers. Calling one of them again is not another. |
-| `hotline-calls` | Calls to 10 distinct hotlines. |
-| `calls-per-day` | 20 calls, familiar numbers included. |
-| `call-gap` | 30 seconds between two calls. |
-| `stranger-texts` | Texts to 3 distinct strangers. |
-| `link-to-stranger` | No text containing a link to anyone but a familiar number. |
-| `same-text` | One text to at most 2 distinct numbers. Texts are compared with case, spaces, punctuation and digits removed; under 8 characters left, they are not compared. |
-| `texts-per-day` | 30 texts. |
-| `locked` | Two refusals by any rule but `call-gap` within 24 hours pause calls and texts to anyone but familiar and emergency numbers for 24 hours from the second. |
+| Rule | Limit | Strike |
+| --- | --- | --- |
+| `calls-per-day` | 10 calls, familiar numbers included. | yes |
+| `stranger-calls` | Calls to 3 distinct strangers. Calling one of them again is not another. | yes |
+| `hotline-calls` | Calls to 10 distinct hotlines. | yes |
+| `call-gap` | 30 seconds between two calls. | no |
+| `call-burst` | Calls to at most 3 distinct numbers, familiar or not, within 15 minutes. | yes |
+| `short-calls` | After 3 calls in a row to different numbers, each over within 15 seconds of being placed, calling waits 30 minutes from the end of the last. | once, when the pattern is first met |
+| `texts-per-day` | 20 texts. | yes |
+| `stranger-texts` | Texts to 3 distinct strangers. | yes |
+| `text-burst` | Texts to at most 3 distinct numbers, familiar or not, within 10 minutes. | yes |
+| `link-to-stranger` | No text containing a link to anyone but a familiar number. | yes |
+| `same-text` | One text to at most 2 distinct numbers. Texts are compared with case, spaces, punctuation and digits removed; under 8 characters left, they are not compared. | yes |
+| `code-relay` | No text containing a verification code this line received in the last 10 minutes (the code read by the rule in *Messages*: a number the message calls a code), to anyone. | yes |
+| `code-flood` | When verification codes arrived from 10 or more distinct senders within 24 hours, nothing goes out (calls and texts) until fewer than 10 remain: the line is receiving codes for others. | no |
+| `sim-changed` | For 24 hours after the SIM changes (a different IMSI), nothing goes to numbers that are not familiar. | no |
+| `forbidden-code` | No dial string that sets up call forwarding (`**21*`, `*21*`, `**61*`, `**62*`, `**67*`, `**002*`, `**004*` and their single-star forms) or withholds the caller id for a call (`#31#`, `*31#`, `*67` before a number). Asking about a service (`*#21#`) or cancelling it (`##21#`) is allowed. | yes |
+| `locked` | Two strikes within 24 hours pause calls and texts to anyone but familiar and emergency numbers for 24 hours from the second; a lock that begins within 7 days of the previous one lasts 7 days. | no |
 
 The same number written two ways (*Contacts* matching rule) is one number. Only what was let
 through counts; the record of it is kept apart from the messages and calls, so deleting a
 conversation does not reset it. A refusal answers `429 outbound_limited` before anything is
-recorded or sent, with `details`: `rule`, `limit` (`null` for `link-to-stranger` and `locked`),
-and `retryAt`, when the same request would go (`null` when it never will). The app explains the
+recorded or sent, with `details`: `rule`, `limit` (`null` where the rule has no number), and
+`retryAt`, when the same request would go (`null` when it never will). The app explains the
 refusal in the user's language from these fields; the message is for logs.
+
+Two further checks are the app's alone, since they ask the user: a text whose wording reads like a
+scam, by the shared list [scam-keywords.json](scam-keywords.json), is sent only after the user
+confirms it, and counts as a strike when a strong entry matched (its file says how entries match); and a call to another
+country than the SIM's, to a premium-rate number, or back to a foreign number that rang for a
+moment, is placed only after the user confirms it. Links in received texts open only after the
+user confirms.
 
 CellPilot is not a replacement for phone service and must not be relied on for emergency calls:
 a call depends on the Internet connection, the backend, the module and the carrier, and an
@@ -202,7 +217,7 @@ Nothing here is a warranty of continued compatibility or availability.
   "version": 1,
   "backend": { "name": "cellpilotd", "version": "0.1.0" },
   "features": ["push", "contacts", "search", "trash", "voicemail", "transcription",
-               "settings", "security", "log", "places", "screening", "portal", "snapshot", "notify"]
+               "settings", "security", "log", "places", "screening", "portal", "snapshot", "notify", "spam"]
 }
 ```
 
@@ -231,6 +246,7 @@ answering machine switched off, say), the backend sends a `features` event with 
 | `screening` | `POST /v1/call/screen`, `POST /v1/call/claim` | Let the backend take a call (voicemail) and take it back. Declared with `voicemail` *and* the answering machine switched on (`settings.voicemail.enabled`). Without it a call cannot be moved between phones either. |
 | `portal` | `POST /v1/portal/session` | The backend has a web UI the app can open. |
 | `snapshot` | `GET /v1/snapshot`, `rev` on `hello` and on events, the `rev` event | Everything a client keeps, at one version, in one request; see *Event stream*. Without it the app reads each list on its own at every connection. |
+| `spam` | `/spam`, `/spam/keywords`, `/blocklist`, `spam` on messages, `outcome: "blocked"`, the `blocklist` event, `spam` and `blocklist` in the snapshot | The backend keeps spam out of the inbox and refuses blocked callers; see *Spam and blocking*. Without it every message is in the inbox and nobody is blocked. |
 | `notify` | the `notify` event and the client's `ack` | The backend asks live clients before it pushes; see *Presence and `notify`*. Without it the backend just pushes, and a phone with the app open shows the banner itself. |
 
 Some fields and routes are optional, and the app does without them (this is the one list; the
@@ -545,6 +561,7 @@ record (`CallRecord`) is made when a call starts and written at three moments:
 | `busy`, `no-answer` | Outgoing, the far end busy or not answering, when the module says so; a backend that cannot tell records `failed`. |
 | `failed` | Outgoing and never connected for any other reason, the caller hanging up before an answer included; `endReason` says why when the network did. |
 | `rejected` | Incoming and declined. Optional: `cellpilotd` records a declined call as `missed`; the app shows `rejected` as declined. |
+| `blocked` | Incoming from a blocked number, refused by the backend before anyone was rung (with `spam`). `seen: true`; not counted as missed. |
 
 A record left open when the backend restarts or the device goes away is closed then: never
 connected (`in-progress`) is `failed`; `answered` is `completed`, ended then, its duration up to
@@ -596,7 +613,7 @@ notified. `parts` stays on the record once complete. Until then it is a message 
 in the conversation list (its body so far as `lastBody`), in search, in the unread count and the
 badge.
 
-`GET /v1/messages/search?q=` (with `search`) finds messages not in the trash whose body or peer
+`GET /v1/messages/search?q=` (with `search`) finds messages not in the trash or spam whose body or peer
 contains `q` as typed — a substring match, case-insensitive for ASCII letters, `%` and `_` taken
 literally — newest first; `limit` defaults to 50, at most 200; an empty `q` answers `[]`.
 
@@ -648,6 +665,134 @@ Two rules make every client and backend agree, and a backend must apply both:
   `13800138000` and `013800138000` are one number; a short service number never matches the
   end of a long one. `Conversation.contactId`, `CallRecord.contactId` and `Call.contactId` are
   filled this way; when numbers of several contacts match, `cellpilotd` takes the one stored first.
+
+## Spam and blocking (feature `spam`)
+
+The backend screens what arrives — the numbers the user blocked, the scam wording in
+[`scam-keywords.json`](scam-keywords.json), and whatever else it judges by — and keeps spam out of
+the inbox. The app shows the verdicts, lets the user correct them, and reports what got through.
+Everything the judgement learns from stays on the backend.
+
+**Verdicts.** With `spam`, every message carries `spam`: `null`, or
+`{ "verdict", "reason", "detail" }`:
+
+| `verdict` | Where it goes |
+| --- | --- |
+| `spam` | Out of the inbox, into the spam folder. Not in `/conversations` (list or messages), search, the unread counts or the badge; not notified (see below). |
+| `suspect` | Stays in the inbox, notified as usual; the app marks it as a possible scam. |
+
+| `reason` | When | `detail` |
+| --- | --- | --- |
+| `blocked` | The sender is on the blocklist. Always `spam`. | `null` |
+| `keyword` | The text matches the wording list: a strong entry makes it `spam`, a medium one `suspect`. | the entry's `id` |
+| `classifier` | The backend's own judgement (a model, signals, a list of its own), or wording together with them. | at most 80 characters, or `null`: the parts that counted, separated by `;` — `keyword:<entry id>`, `signal:<id>,<id>` (below), `words:<phrase>,<phrase>` (the phrases that weighed most) — or free text, which the app shows as it is |
+| `report` | The user reported it (below). Always `spam`. | `null` |
+
+A link alone is no reason: plenty of genuine texts carry one, and the app already asks before
+opening it. Someone the user knows — a contact, someone they have texted, or a sender whose
+messages they took out of spam (below) — is never put in spam except by the blocklist: strong
+wording and signals only mark their texts, and medium wording and a model leave them alone. They
+are weighed down, not waved through: a fake base station can send as anyone. A message keeps the
+verdict it arrived with; changing the blocklist does not re-judge old ones.
+
+**How `cellpilotd` judges, and how a backend may.** A blocked sender is spam. Otherwise evidence is
+counted in points: strong wording 2, medium wording 1, each signal 1, a model learnt from this
+backend's own examples (below) 2 at a probability of 0.99 or more and 1 from 0.9. Two points file a
+text in spam, one marks it, so weak evidence adds up: medium wording with a signal is filed. Three
+limits: someone the user knows is only ever marked, and only by strong wording or signals (medium
+wording and the model leave them alone); a text carrying a verification code is filed only on
+strong wording; from an official sender (a gateway, a short code, a sender name) the model counts at
+most 1. A warning marker of the wording list cancels medium entries, and strong ones too when the
+sender is official, whose anti-fraud notices are not put to the model either. Wording alone is
+reported as `keyword` with the entry's id; anything else as `classifier` with every part that
+counted.
+
+The model is naive Bayes in the form spam filters settled on (Robinson's per-token probabilities,
+each pulled towards 0.5 while rarely seen, the 15 most telling combined by Fisher's chi-square
+method), over the text NFKC-normalised and lowercased, with links, sums of money, long numbers and
+other digits replaced by placeholders, cut into every two- and three-character piece of each run of
+Chinese characters (spaces and symbols between them dropped first) and into words otherwise, plus
+the sender's kind (mobile, gateway, short code, international, name) and the signals' features. A
+token's probability comes from its share of each label's examples, so the labels weigh equally
+whatever their counts. It judges only with at least 20 spam examples and at least 100 genuine ones,
+and no fewer genuine than spam: it is only as good as its view of what the line ordinarily
+receives. Its `detail` lists, as `words:`, the runs of the text whose pieces point to spam,
+strongest first. Nothing is shipped trained.
+
+Signals count 1 each, whoever sends the text:
+
+| `signal:` id | When |
+| --- | --- |
+| `ip-link` | A link to a bare IP address. |
+| `signature-from-mobile` | An institution's 【signature】 (a bank, a carrier, a court, a platform…) on a text from a personal mobile or an international number. |
+| `chat-handle-money` | A chat contact (WeChat, QQ, WhatsApp, Telegram…) offered together with money: a sum, commission, daily pay. |
+| `short-link-from-mobile` | A short link (bit.ly, t.cn…) on a text from a personal mobile or an international number. |
+| `odd-tld-link` | A link on a top-level domain genuine senders rarely use (.top, .xyz, .vip, .cc, .shop…). |
+| `link-money-from-mobile` | A link and money together, on a text from a personal mobile or an international number. |
+
+**The wording list on this backend.** `GET /v1/spam/keywords` answers `{ "version", "keywords": [...] }`,
+one per entry of the list the backend applies: `{ "id", "terms", "listed": "strong" | "medium",
+"effective": "strong" | "medium" | "off", "hits", "restored", "reported", "enabled" }`. `hits`
+counts texts it put a verdict on, `restored` texts it filed that the user took out of spam,
+`reported` texts it marked that the user reported. An entry with `restored` of 3 or more and more
+than `reported` only marks from then on (`effective: "medium"`); a backend may choose another rule.
+`PATCH /v1/spam/keywords/{id}` (`{ "enabled": false }`) switches an entry off on this backend, and
+back on with `true`; no such entry is `404`.
+
+**The spam folder** works like the trash. `GET /v1/spam` lists one conversation per peer with
+spam messages, summarised from them, with `unread: 0` and `spam` — the verdict of the newest of
+them. `GET /v1/spam/{peer}/messages` pages through a peer's spam messages, as `/conversations/{peer}/messages` does the inbox.
+`POST /v1/spam/restore` (`{ "peers": [...] }`) is *not spam*: it puts all of a peer's spam back in
+the inbox with `spam: null`, unread as they were, and the peer is trusted from then on (above).
+`POST /v1/spam/purge` deletes them for good. Both take the same `{ "peers" }` as the trash (empty is
+`400`; past 500 only the first 500). Spam may be purged once it is 30 days old. Each sends
+`conversations` with `spam`; restoring may move `badge`.
+
+**Reporting.** `POST /v1/spam/report` (`{ "peers": [...], "then": "trash" | "purge" }`) is the user
+saying a conversation in the inbox is spam that got through. The backend keeps its incoming
+messages as examples of spam (below), then moves the conversation to the trash (`then: "trash"`,
+with `trash`) or deletes it for good (`"purge"`, or without `trash`), and adds each peer to the
+blocklist, so its calls are refused and its texts go to spam from then on. Events as for deleting a
+conversation, then `blocklist` when it changed.
+
+**Blocklist.** `GET /v1/blocklist` answers `{ "numbers": [{ "number", "addedAt" }] }`, newest first.
+`POST /v1/blocklist` (`{ "number" }`) adds one: a number as for *Numbers* (stripped of grouping,
+3–20 digits with an optional `+`), or a sender name such as `Bank-OTP` (1–20 letters, digits,
+spaces, `-` or `_`); anything else is `400` with `"number"`. Adding one already there is `200`.
+`DELETE /v1/blocklist/{number}` (URL-encoded) removes it — `200` also when it was not there. A
+number matches every way of writing it (*Numbers*: the same person is the same peer); a sender name
+matches exactly, ignoring case. Each change sends `blocklist` (the whole list) with a rev; the
+snapshot carries `blocklist` too.
+
+A text from a blocked sender is `spam` with reason `blocked`. A call from one is refused before
+anyone is rung: no `call` event, no `notify`, no VoIP push; the backend hangs it up as soon as the
+number is known and records it with `outcome: "blocked"`, `seen: true` (*The history*). A withheld
+number cannot be blocked.
+
+**What the phone is told.** Neither spam nor a blocked call is announced like the real thing: no
+`notify`, no sound, no banner over what the user is doing. The backend sends one quiet alert push
+per item (category `spam`, *Push*), saying it was stopped, from whom and why, so the user can look
+if they want. It does not count towards the badge.
+
+**What the judgement learns from.** The backend keeps its own examples; nothing is sent anywhere.
+Each one is a line of JSON — what `cellpilotd` exports, and what a backend training its own model
+should collect:
+
+```json
+{ "text": "…", "label": "spam", "source": "report", "peer": "+8613812345678", "at": "2026-10-10T08:00:00.000Z" }
+```
+
+| `source` | `label` | When |
+| --- | --- | --- |
+| `report` | `spam` | The user reported the conversation; one example per incoming message in it. |
+| `restore` | `ham` | The user took the peer's messages out of spam; one per message, whatever had put it there. |
+| `blocked` | `spam` | A text from a blocked sender. |
+| `keyword` | `spam` | A text a strong entry put in spam, not taken out within 30 days. |
+| `kept` | `ham` | A text from someone the user knows, or a short code, a week in the inbox unmarked and unreported: what the line ordinarily receives. |
+
+`peer` is optional; leave it out of anything that leaves the machine. A backend should keep at
+least the last 5,000 and may drop the oldest. `cellpilotd` keeps them in its database and serves
+them as JSON lines from `GET /console/spam/examples` (administrator token, this machine only).
 
 ## Numbers
 
@@ -819,8 +964,8 @@ alerts, its own record (`client`, with `pushTokens`), the push state and the bad
 in one request. That is the app's only refresh; there is no polling.
 
 What moves `rev`, and the event that carries the new one: a message recorded or changing status
-(`message`); the conversation list or the trash (`conversations`); the history (`calls`); contacts
-(`contacts`); the recordings (`voicemails`); the checks' findings or the alerts (`security`); the
+(`message`); the conversation list, the trash or the spam folder (`conversations`); the history (`calls`); contacts
+(`contacts`); the blocklist (`blocklist`); the recordings (`voicemails`); the checks' findings or the alerts (`security`); the
 feature list (`features`); the settings and a change of the push `problem` (a bare `rev`). Nothing
 else does: not `status`, `call`, `audio`, a live `voicemail`, `log`, `badge`, `client` or `notify`,
 nor registering a push token, nor an enrolment on the relay (the app that enrolled has the
@@ -833,7 +978,7 @@ snapshot for nothing.
 
 A backend without `snapshot` leaves `rev` out. The app then reads everything again at each
 connection, one request per list (`/status`, `/conversations`, `/calls`, and `/trash`,
-`/contacts`, `/voicemails`, `/settings`, `/security` as declared, then `/client`), and applies
+`/spam`, `/blocklist`, `/contacts`, `/voicemails`, `/settings`, `/security` as declared, then `/client`), and applies
 the events that follow as they come. That is always correct, only slower.
 
 Then, as things happen, one JSON text frame per event:
@@ -844,7 +989,8 @@ Then, as things happen, one JSON text frame per event:
 | `call` | `call`, `holder` | The call or its holder changed. Sent at every transition, including to `null`. |
 | `audio` | `active` | The backend started (`true`: its audio path is up for the call, which can be before it connects) or stopped exchanging audio frames with the holder. The app turns its microphone and speaker on at `true`. |
 | `message` | `message` | A message arrived (each part of a long one), an outgoing one was recorded, or it changed status. |
-| `conversations` | `conversations`, `trash`? | The conversation list changed (new message, read, deleted, restored). |
+| `conversations` | `conversations`, `trash`?, `spam`? | The conversation list changed (new message, read, deleted, restored, spam arrived or taken out). `trash` with the `trash` feature, `spam` with `spam`. |
+| `blocklist` | `numbers` | The blocklist changed (with `spam`); the whole list, as `GET /v1/blocklist`. |
 | `contacts` | `contacts` | The contact list changed. |
 | `calls` | `calls` | The history changed; carries the newest page (see *The history*). |
 | `voicemail` | `peer`, `reason`: `no-answer`\|`declined`, `recording`, `transcript`, `delta`? | The answering machine is recording (`recording: true`, `transcript` the whole text so far, `delta` the new part) or finished; see *The answering machine*. |
@@ -854,7 +1000,7 @@ Then, as things happen, one JSON text frame per event:
 | `features` | `features` | What the backend can do changed; the same list as `GET /v1`. |
 | `log` | `event` | One log entry, with the `log` feature. |
 | `rev` | `rev` | Something clients keep changed that no event carries (settings): fetch a snapshot. |
-| `badge` | `badge` | The app icon's count changed: unread incoming messages not in the trash + records with `seen: false` + unheard voicemails + unacknowledged alerts. |
+| `badge` | `badge` | The app icon's count changed: unread incoming messages not in the trash or spam + records with `seen: false` + unheard voicemails + unacknowledged alerts. |
 | `notify` | `id`, `kind`, `callId`?, `reason`? | Something that may call for a notification; only to one client's sockets, which answers with `ack` (below). |
 
 Unknown types must be ignored, so a backend may add its own. Which happening sends which events,
@@ -935,6 +1081,9 @@ clients are asked nothing and pushed nothing.
 | Happening | Events (to every socket) | `notify` kind (wait) | Push | Excluded |
 | --- | --- | --- | --- | --- |
 | A message arrives (a long one: once complete) | `message` rev (also per part, each part maybe moving `badge`), `conversations` rev, `badge` | `sms` (5 s) | alert `sms`, `sms-<id>` | — |
+| A message arrives that is spam (with `spam`) | `message` rev, `conversations` rev | — | quiet alert `spam`, `spam-<id>` | — |
+| A blocked number calls (with `spam`) | `calls` rev when the record ends | — | quiet alert `spam`, `call-<id>` | — |
+| The blocklist changes | `blocklist` rev | — | — | — |
 | An outgoing message is recorded | `message` rev (`pending`) | — | — | — |
 | It is sent or fails | `message` rev, `conversations` rev | — | — | — |
 | A call starts ringing (number known, or 2 s) | `call` | `call` (1.5 s), clients without a VoIP token | VoIP at once to clients with a VoIP token; alert `call`, `call-<id>`, to the others not on screen | — |
@@ -1017,7 +1166,7 @@ security alert. In the clear it says nothing:
 
 The clear text says only what kind of thing arrived; the app's notification extension replaces
 it with the sealed contents, `{ "title", "body", "category", …data }`, worded in the client's
-language, `category` the same as `aps.category`. These are the only five categories, and the
+language, `category` the same as `aps.category`. These are the only six categories, and the
 app routes a tap by them and by the field names:
 
 | What | `category` | sealed `title` / `body` | sealed data | collapse id | `interruption-level` | `sound` |
@@ -1027,6 +1176,7 @@ app routes a tap by them and by the field names:
 | A missed call | `missed-call` | the caller / "Missed call" ("Missed call · no message left" when the machine took it and got no message) | `number`, `callId` | `call-<id>` | `active` | `default` |
 | A voicemail | `voicemail` | the caller / e.g. "Missed call · voicemail 18 sec" | `voicemailId`, `number`, `callId` | `call-<id>` (`voicemail-<id>` without a record) | `active` | `default` |
 | A security alert | `security` | "Security alert: " + its title / the first line of its detail | `alertId` | `alert-<id>` | `time-sensitive` | `default` |
+| Spam stopped, or a blocked call (with `spam`) | `spam` | the sender's name or number / what was stopped and why, e.g. "Spam stopped · scam wording", "Call blocked · on your blocklist" — never the text itself | `peer`, `messageId` or `callId`, `reason` | `spam-<id>` or `call-<id>` | `passive` | none (no `sound` key) |
 
 `mutable-content: 1` is required: it is what lets the extension open `e`. The relay passes an
 alert only as exactly `aps`, `e` and `v`: `aps.alert.title` `"CellPilot"`, `aps.alert.body` a string
@@ -1036,7 +1186,7 @@ holding only `alert`, `sound`, `category`, `interruption-level`, `mutable-conten
 `badge` (an integer 0–99999), and `e` 16–4000 characters long. Everything in `aps` travels in the
 clear: put nothing in the alert's body or in `thread-id` that names a person or quotes a message.
 
-Every alert push but a ringing call's carries the icon count as `aps.badge`: unread incoming messages not in the trash
+Every alert push but a ringing call's carries the icon count as `aps.badge`: unread incoming messages not in the trash or spam
 + records with `seen: false` + unheard voicemails + unacknowledged alerts, the same number as
 `hello`, the `badge` event and the snapshot's `badge`. When something is read on one client,
 clients without a live socket get `{ "aps": { "badge": n } }` alone — nothing sealed, nothing
@@ -1221,6 +1371,7 @@ API: the app never calls them, and a backend driving a real device must not offe
 | `POST /_sim/call` | `{ "from" }` (`null`: withheld) | A call rings. |
 | `POST /_sim/hangup` | `{}` | The far end hangs up; a call still ringing is then missed. |
 | `POST /_sim/answer` | `{}` | The far end answers the outgoing call. Optional: a simulator may answer by itself. |
+| `GET /_sim/state` | | Optional: what the far end has received — `{ call, sent: [{ to, text, at }], dtmf: [] }` — so a test can check that a text really left, or that one was held back. |
 
 Each answers `200 {}`, or `409` when it does not fit (a call already up).
 

@@ -134,6 +134,7 @@ The core is required. Everything else is optional and declared by the backend.
 | `contacts` | Contacts kept by the backend, matched to numbers |
 | `search` | Full-text search over messages |
 | `trash` | Deleted conversations kept for restoring |
+| `spam` | A spam folder and a blocklist: spam kept out of the inbox, blocked callers refused, reports kept on the backend |
 | `voicemail` | An answering machine that picks up unanswered calls and records them |
 | `transcription` | Live and on-demand transcripts of voicemail |
 | `screening` | Sending a ringing call to the answering machine, and taking it back |
@@ -189,10 +190,12 @@ subject to the [acceptable use policy](ACCEPTABLE_USE.md): your own SIM, from yo
 no fraud, bulk or automated calls or messages, caller-ID changes, SIM pools or code-receiving
 services.
 
-**Made for receiving.** Calls and texts are limited to what one person needs now and then: each
-day, calls to 3 and texts to 3 numbers that are not contacts and have not contacted you, no links
-to such numbers, 20 calls and 30 texts in all. The app enforces this, and a backend should too
-(see *Outbound limits* in the [specification](spec/device-api.md)).
+**Made for receiving.** Calls and texts are limited to what one person needs now and then: a number
+is familiar three days after it is a contact or has contacted you; each day, calls to 3 and texts to
+3 numbers not yet familiar, no links to them, 10 calls and 20 texts in all, and no more than 3
+different numbers in a few minutes. Verification codes the line receives cannot be sent on, and
+call forwarding cannot be set up. The app enforces this, and a backend should too (see *Outbound
+limits* in the [specification](spec/device-api.md)).
 
 **Not for emergencies.** CellPilot is not a replacement for phone service. A call depends on your
 Internet connection, your backend, the module and the carrier, and an emergency call leaves from

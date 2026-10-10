@@ -542,6 +542,155 @@ paths:
         "200": { $ref: "#/components/responses/Empty" }
         "400": { $ref: "#/components/responses/Error" }
 
+  /spam:
+    get:
+      operationId: listSpam
+      tags: [messages]
+      summary: "垃圾短信文件夹里的会话"
+      x-feature: spam
+      responses:
+        "200":
+          description: "垃圾短信会话"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+  /spam/{peer}/messages:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    get:
+      operationId: listSpamMessages
+      tags: [messages]
+      summary: "某个号码的垃圾短信，最新的在前"
+      x-feature: spam
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Messages" }
+  /spam/restore:
+    post:
+      operationId: restoreSpam
+      tags: [messages]
+      summary: "不是垃圾短信：把这个号码的垃圾短信放回收件箱，并从此信任这个号码"
+      x-feature: spam
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/purge:
+    post:
+      operationId: purgeSpam
+      tags: [messages]
+      summary: "永久删除垃圾短信"
+      x-feature: spam
+      requestBody: { $ref: "#/components/requestBodies/Peers" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/report:
+    post:
+      operationId: reportSpam
+      tags: [messages]
+      summary: "把会话举报为垃圾短信：拉黑发送方，然后移入回收站或永久删除"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [peers, then]
+              properties:
+                peers: { type: array, items: { type: string }, minItems: 1 }
+                then: { type: string, enum: [trash, purge], description: '"trash" 移入回收站（需要 trash 特性），"purge" 永久删除。' }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /spam/keywords:
+    get:
+      operationId: listSpamKeywords
+      tags: [messages]
+      summary: "这个后端应用的诈骗话术表"
+      x-feature: spam
+      responses:
+        "200":
+          description: "每个条目及其计数，以及是否被降级或关闭"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, keywords]
+                properties:
+                  version: { type: integer }
+                  keywords: { type: array, items: { $ref: "#/components/schemas/SpamKeyword" } }
+  /spam/keywords/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: "条目 id" }
+    patch:
+      operationId: setSpamKeyword
+      tags: [messages]
+      summary: "关闭或打开一个话术条目"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean, description: "false 在这个后端上关闭；true 重新打开。" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /blocklist:
+    get:
+      operationId: getBlocklist
+      tags: [messages]
+      summary: "黑名单"
+      x-feature: spam
+      responses:
+        "200":
+          description: "被拉黑的号码和发送方名称，最新的在前"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [numbers]
+                properties:
+                  numbers: { type: array, items: { $ref: "#/components/schemas/BlockedNumber" } }
+    post:
+      operationId: addToBlocklist
+      tags: [messages]
+      summary: "拉黑一个号码或发送方名称"
+      x-feature: spam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number]
+              properties:
+                number: { type: string, description: "号码（去掉分组后 3–20 位数字，可带 +）或发送方名称（1–20 个字母、数字、空格、- 或 _）。" }
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+        "400": { $ref: "#/components/responses/Error" }
+  /blocklist/{number}:
+    parameters:
+      - { name: number, in: path, required: true, schema: { type: string }, description: "黑名单条目，URL 编码。" }
+    delete:
+      operationId: removeFromBlocklist
+      tags: [messages]
+      summary: "取消拉黑"
+      x-feature: spam
+      responses:
+        "200": { $ref: "#/components/responses/Empty" }
+
   /contacts:
     get:
       operationId: listContacts
@@ -877,7 +1026,7 @@ components:
               additionalProperties: true
               properties:
                 field: { type: string, description: '出错的字段；嵌套字段用点连接（"voicemail.answerAfterS"）。' }
-                rule: { type: string, enum: [stranger-calls, hotline-calls, calls-per-day, call-gap, stranger-texts, link-to-stranger, same-text, texts-per-day, locked], description: "`outbound_limited`：拒绝的是哪条外发限制。" }
+                rule: { type: string, enum: [calls-per-day, stranger-calls, hotline-calls, call-gap, call-burst, short-calls, texts-per-day, stranger-texts, text-burst, link-to-stranger, same-text, code-relay, code-flood, sim-changed, forbidden-code, locked], description: "`outbound_limited`：拒绝的是哪条外发限制。" }
                 limit: { type: [integer, "null"], description: "达到的上限：外发限制（`outbound_limited`），或配对手机数上限（`POST /v1/pair`）；规则没有数字上限时为 null。" }
                 retryAt: { type: [string, "null"], format: date-time, description: "`outbound_limited`：同样的请求何时可以再次通过；永远不会通过时（发给陌生号码的链接）为 null。" }
 
@@ -981,6 +1130,8 @@ components:
         features: { type: array, items: { type: string } }
         conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
         trash: { type: array, items: { $ref: "#/components/schemas/Conversation" }, description: "回收站；没有 trash 特性时为 []。" }
+        spam: { type: array, items: { $ref: "#/components/schemas/Conversation" }, description: "垃圾短信文件夹；没有 spam 特性时为 []。" }
+        blocklist: { type: array, items: { $ref: "#/components/schemas/BlockedNumber" }, description: "黑名单；没有 spam 特性时为 []。" }
         calls: { type: array, items: { $ref: "#/components/schemas/CallRecord" }, description: "通话记录最新一页（100 条）。" }
         voicemails: { type: array, items: { $ref: "#/components/schemas/Voicemail" }, description: "没有 voicemail 特性时为 []。" }
         client:
@@ -1118,8 +1269,8 @@ components:
         endedAt: { type: [string, "null"], format: date-time }
         outcome:
           type: string
-          enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress]
-          description: "接通前 in-progress；通话中 answered（不会是最终值）；接通过的通话结束为 completed；答录机接了并留下留言的为 voicemail（从它手里接过来的改为 answered，结束为 completed）；没接通的来电、或答录机接了但没有留言的为 missed；去电为 busy / no-answer / failed；rejected 可选（拒接）。见规范“通话记录”。"
+          enum: [answered, completed, missed, rejected, busy, no-answer, failed, voicemail, in-progress, blocked]
+          description: "接通前 in-progress；通话中 answered（不会是最终值）；接通过的通话结束为 completed；答录机接了并留下留言的为 voicemail（从它手里接过来的改为 answered，结束为 completed）；没接通的来电、或答录机接了但没有留言的为 missed；去电为 busy / no-answer / failed；rejected 可选（拒接）。见规范“通话记录”。；blocked（需要 `spam`）：黑名单号码的来电，在任何人被呼叫前就被拒接；seen。"
         durationS: { type: [integer, "null"], description: "从接通（答录机接的从它接起）到结束；没接通或没结束为 null。" }
         endReason: { type: [string, "null"], description: "failed 时的原因，使用读者的语言；其他为 null。" }
         place: { type: [string, "null"], description: "有 `places` 特性时提供。" }
@@ -1138,6 +1289,9 @@ components:
         lastAt: { type: string, format: date-time }
         lastDirection: { type: string, enum: [in, out] }
         unread: { type: integer, description: "收到的未读条数；回收站里的会话总是 0。" }
+        spam:
+          oneOf: [{ $ref: "#/components/schemas/Spam" }, { type: "null" }]
+          description: "只在垃圾短信文件夹里出现：最新一条垃圾短信的结论。"
 
     Message:
       type: object
@@ -1159,6 +1313,37 @@ components:
           description: "分几段的短信：已到几段。收齐后（received 等于 total）仍保留；只有一段的短信为 null。"
         error: { type: [string, "null"], description: "failed 的短信为什么失败；其他为 null。" }
         read: { type: boolean }
+        spam:
+          oneOf: [{ $ref: "#/components/schemas/Spam" }, { type: "null" }]
+          description: "筛查结论，需要 `spam` 特性；普通短信为 null。"
+
+    Spam:
+      type: object
+      required: [verdict, reason, detail]
+      properties:
+        verdict: { type: string, enum: [spam, suspect], description: "spam：不进收件箱，放在垃圾短信文件夹；suspect：留在收件箱，标为疑似诈骗。" }
+        reason: { type: string, enum: [blocked, keyword, classifier, report], description: "blocked：发送方在黑名单中；keyword：命中话术表（强 → spam，中 → suspect）；classifier：后端自己的判断；report：用户举报。" }
+        detail: { type: [string, "null"], description: "keyword：条目 id；classifier：用 ; 分隔的计分项：`keyword:<id>`、`words:<短语>,…`、`signal:<id>,…`（ip-link、odd-tld-link、signature-from-mobile、chat-handle-money、short-link-from-mobile、link-money-from-mobile）或自由文字（≤ 80 字），或 null；其他为 null。" }
+
+    SpamKeyword:
+      type: object
+      required: [id, terms, listed, effective, hits, restored, reported, enabled]
+      properties:
+        id: { type: string }
+        terms: { type: array, items: { type: string } }
+        listed: { type: string, enum: [strong, medium] }
+        effective: { type: string, enum: [strong, medium, "off"], description: "这个后端实际应用的强度：放进垃圾短信的短信被移出 3 次以上且多于举报时降为 medium；关闭时为 off。" }
+        hits: { type: integer }
+        restored: { type: integer }
+        reported: { type: integer }
+        enabled: { type: boolean }
+
+    BlockedNumber:
+      type: object
+      required: [number, addedAt]
+      properties:
+        number: { type: string }
+        addedAt: { type: string, format: date-time }
 
     Contact:
       type: object
