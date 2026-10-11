@@ -357,6 +357,16 @@ async function main() {
     }
   }
 
+  if (has('trash')) {
+    const bin = (await get('/trash')).body?.conversations ?? [];
+    if (bin.length) {
+      await check('trash: GET /v1/trash/{peer}/messages reads what the bin holds', async () => {
+        const m = await ok(`/trash/${encodeURIComponent(bin[0].peer)}/messages`, '/trash/{peer}/messages');
+        must(m.messages.length > 0, `the bin lists ${bin[0].peer} but holds no message of it`);
+        return `${m.messages.length} message(s)`;
+      });
+    } else skip('trash: GET /v1/trash/{peer}/messages', 'the bin is empty');
+  }
   if (has('spam')) await check('spam: GET /v1/blocklist', async () => { const b = await ok('/blocklist'); return `${b.numbers.length} entr(ies)`; });
   if (has('spam')) await check('spam: GET /v1/spam/keywords', async () => { const b = await ok('/spam/keywords'); return `${b.keywords.length} entr(ies), list version ${b.version}`; });
 
@@ -609,6 +619,19 @@ async function arrivalChecks(stream, { has, myClientId, audioReady, badge }) {
         const n = await stream.waitFor((x) => x.type === 'notify' && x.kind === 'sms', 'notify sms', 5000, from);
         must(msg && n.id === `sms-${msg.id}`, `notify id is ${n.id}, expected sms-${msg?.id}`);
         ack(n);
+      });
+    }
+    if (has('trash')) {
+      await check('write: one message into the trash, read there by GET /v1/trash/{peer}/messages, restored', async () => {
+        must(msg, 'no message to trash');
+        must((await call('POST', `/messages/${msg.id}/trash`)).status === 200, 'trash refused');
+        const binned = await ok(`/trash/${encodeURIComponent(msg.peer)}/messages`, '/trash/{peer}/messages');
+        must(binned.messages.some((m) => m.id === msg.id), 'the trashed message is not in the bin');
+        const live = await ok(`/conversations/${encodeURIComponent(msg.peer)}/messages`, '/conversations/{peer}/messages');
+        must(!live.messages.some((m) => m.id === msg.id), 'the trashed message is still in the conversation');
+        must((await call('POST', '/trash/restore', { peers: [msg.peer] })).status === 200, 'restore refused');
+        const back = await ok(`/conversations/${encodeURIComponent(msg.peer)}/messages`, '/conversations/{peer}/messages');
+        must(back.messages.some((m) => m.id === msg.id), 'not back after restore');
       });
     }
   }

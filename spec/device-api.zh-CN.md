@@ -142,7 +142,7 @@ CellPilot 仅为合法用途而制作。我们遵守法律法规，不认可、�
 | `push` | `POST /v1/client/push-tokens`、`DELETE /v1/client/push-tokens/{token}`、`GET /v1/push`、`POST /v1/push/enrol` | App 登记 APNs token；后端经 CellPilot 中转推送，由 App 替它在中转登记。 |
 | `contacts` | `/contacts` | 后端保存的联系人，有姓名和多个号码；见“联系人”。 |
 | `search` | `GET /v1/messages/search` | 短信全文搜索。 |
-| `trash` | `/trash`、`POST /v1/messages/{id}/trash` | 删除的会话留在回收站可恢复。没有它删除即永久。 |
+| `trash` | `/trash`、`/trash/{peer}/messages`、`POST /v1/messages/{id}/trash` | 删除的会话留在回收站可恢复。没有它删除即永久。 |
 | `voicemail` | `/voicemails`、`settings.voicemail`、`voicemail` 事件 | 后端替接无人接听的来电并录音；见“答录机”。后端*有能力*时就声明：设置里关掉答录机仍然声明（留言和设置还在），只撤掉 `screening`。 |
 | `transcription` | `POST /v1/voicemails/{id}/transcribe`、`settings.transcription`、`voicemail` 事件里的实时转写 | 依赖 `voicemail`。能转写时就声明（`cellpilotd`：语音模型装好了），与转写开关无关。 |
 | `settings` | `GET/PATCH /v1/settings` | 用户可改的后端设置。 |
@@ -371,7 +371,7 @@ App 按优先级经有响应的最优端点连接：比当前更优的端点会�
 
 `GET /v1/messages/search?q=`（有 `search` 时）查找不在回收站和垃圾短信里、正文或号码包含 `q` 的短信——子串匹配，ASCII 字母不分大小写，`%` 和 `_` 按字面——新的在前；`limit` 默认 50、最多 200；`q` 为空回 `[]`。
 
-回收站装的是短信。`GET /v1/trash` 对每个有短信在回收站里的 peer 列一项，按这些短信汇总——所以一个 peer 可以同时出现在两个列表里——`unread` 总是 `0`。回收站里的短信不出现在 `/conversations/{peer}/messages`、搜索和角标里，也没有逐条读取的接口：按 peer 恢复或清除。`POST /v1/trash/restore` 和 `POST /v1/trash/purge` 带 `{ "peers": [...] }`（空的是 `400`；超过 500 个只处理前 500 个）：恢复把这个 peer 在回收站里的短信全部放回，清除把它们永久删除，不动这个 peer 在会话列表里的短信。移入回收站满 30 天的可以清除（`cellpilotd` 在启动时清除）。这些操作都发带 `trash` 的 `conversations` 事件。
+回收站装的是短信。`GET /v1/trash` 对每个有短信在回收站里的 peer 列一项，按这些短信汇总——所以一个 peer 可以同时出现在两个列表里——`unread` 总是 `0`。回收站里的短信不出现在 `/conversations/{peer}/messages`、搜索和角标里；`GET /v1/trash/{peer}/messages` 分页读取一个 peer 在回收站里的短信（`beforeId`、`limit`，新的在前，和收件箱一样），按 peer 恢复或清除。`POST /v1/trash/restore` 和 `POST /v1/trash/purge` 带 `{ "peers": [...] }`（空的是 `400`；超过 500 个只处理前 500 个）：恢复把这个 peer 在回收站里的短信全部放回，清除把它们永久删除，不动这个 peer 在会话列表里的短信。移入回收站满 30 天的可以清除（`cellpilotd` 在启动时清除）。这些操作都发带 `trash` 的 `conversations` 事件。
 
 一条短信是 `{ "id", "direction": "in"|"out", "peer", "body", "status": "pending"|"sent"|"failed"|"received", "createdAt", "deviceTime", "parts", "error", "read" }`，每个字段都有：`deviceTime` 是网络给收到的短信打的时间（发出的短信、或网络没给时为 `null`），`parts` 对分几段的短信是 `{ "received", "total" }`、对一段的为 `null`，`error` 说明 `failed` 的为什么失败，其他为 `null`。
 

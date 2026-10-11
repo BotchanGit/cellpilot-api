@@ -23,6 +23,8 @@ change. Tools are versioned with the repository.
   pass it on.
 - The app lists the account's backends in Settings and can remove one, freeing its place for a new
   backend (`DELETE /v1/session/backends/{id}`).
+- `GET /v1/trash/{peer}/messages` (feature `trash`) reads a number's messages in the trash, so a
+  conversation opened from the bin shows what is in it.
 
 ## 2026-10-10
 
@@ -204,6 +206,7 @@ First public release of the CellPilot Device API v1.
 - 中转的每个拒绝都在 `error` 之外带 `code`（`backend-limit`、`grant-not-accepted`、`proof-rejected` 等）。因账号没有名额被拒的登记（`409 backend-limit`）会列出占着名额的后端，许可不消耗。
 - 中转把登记被拒的原因记在许可上，App 用自己的会话可以查到（`GET /v1/session/enrolment`），所以即使后端没有转达，用户也能看到原因。
 - App 在设置里列出账号下的后端，可以移除其中一个，把名额腾给新后端（`DELETE /v1/session/backends/{id}`）。
+- `GET /v1/trash/{peer}/messages`（功能 `trash`）读取一个号码在回收站里的短信，回收站里的会话点开就能看到内容。
 
 ### 2026-10-10
 

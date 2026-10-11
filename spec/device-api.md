@@ -236,7 +236,7 @@ answering machine switched off, say), the backend sends a `features` event with 
 | `push` | `POST /v1/client/push-tokens`, `DELETE /v1/client/push-tokens/{token}`, `GET /v1/push`, `POST /v1/push/enrol` | The app registers its APNs tokens; the backend pushes through the CellPilot relay, which the app enrols it on. |
 | `contacts` | `/contacts` | People with names and numbers, kept by the backend; see *Contacts*. |
 | `search` | `GET /v1/messages/search` | Full-text search over messages. |
-| `trash` | `/trash`, `POST /v1/messages/{id}/trash` | Deleted conversations are kept for restoring. Without it, deletion is final. |
+| `trash` | `/trash`, `/trash/{peer}/messages`, `POST /v1/messages/{id}/trash` | Deleted conversations are kept for restoring. Without it, deletion is final. |
 | `voicemail` | `/voicemails`, `settings.voicemail`, the `voicemail` event | The backend answers unanswered calls and records them; see *The answering machine*. Declared when the backend *can* do it: with the answering machine switched off in the settings it stays declared (the recordings and the setting remain), and only `screening` goes. |
 | `transcription` | `POST /v1/voicemails/{id}/transcribe`, `settings.transcription`, live transcript in the `voicemail` event | Requires `voicemail`. Declared when transcription can be done (in `cellpilotd`: the speech models are installed), whatever its switch. |
 | `settings` | `GET/PATCH /v1/settings` | User-changeable backend settings. |
@@ -619,8 +619,9 @@ literally — newest first; `limit` defaults to 50, at most 200; an empty `q` an
 
 The trash holds messages. `GET /v1/trash` lists one conversation per peer with messages in it,
 summarised from those messages — so a peer can be in both lists — always with `unread: 0`.
-Trashed messages are not in `/conversations/{peer}/messages`, search or the badge, and nothing
-reads them one by one: they are restored or purged by peer. `POST /v1/trash/restore` and
+Trashed messages are not in `/conversations/{peer}/messages`, search or the badge;
+`GET /v1/trash/{peer}/messages` pages through a peer's (`beforeId`, `limit`, newest first, as for
+the inbox), and they are restored or purged by peer. `POST /v1/trash/restore` and
 `POST /v1/trash/purge` take `{ "peers": [...] }` (empty is `400`; past 500 only the first 500 are
 done): restore puts all of a peer's trashed messages back, purge deletes them for good and leaves
 the peer's live messages alone. A trashed message may be purged once it is 30 days old (`cellpilotd` purges when it starts). Each of these sends a

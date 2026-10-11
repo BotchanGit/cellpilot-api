@@ -521,6 +521,18 @@ paths:
                 required: [conversations]
                 properties:
                   conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+  /trash/{peer}/messages:
+    parameters: [{ $ref: "#/components/parameters/peer" }]
+    get:
+      operationId: listTrashMessages
+      tags: [messages]
+      summary: "某个号码在回收站里的短信，最新的在前"
+      x-feature: trash
+      parameters:
+        - { $ref: "#/components/parameters/beforeId" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Messages" }
   /trash/restore:
     post:
       operationId: restoreConversations
