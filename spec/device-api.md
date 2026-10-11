@@ -159,7 +159,7 @@ change, restrict or shut down the feature or service concerned.
   | 429 | `rate_limited` | Too many failed attempts from this source. `Retry-After` (seconds) is set. |
   | 429 | `outbound_limited` | `dial` or `send` refused by the outbound limits (*Outbound limits*); `details` says which rule and until when. |
   | 500 | `internal` | Anything else, the module refusing a command included (see *The call*). |
-  | 502 | `upstream_failed` | `POST /v1/push/enrol` only: the relay refused the enrolment or could not be reached. |
+  | 502 | `upstream_failed` | `POST /v1/push/enrol` only: the relay refused the enrolment or could not be reached; `details.relay` says which (*Push*). |
   | 503 | `device_unavailable` | The device is not attached or not ready. |
 
 - Language: the client sends `X-Lang: en` or `X-Lang: zh` on every request and on the event
@@ -1235,7 +1235,11 @@ user's Sign in with Apple identity, which the app handles. The app does the intr
    through the relay, which lets it reach the phones of that account and no others. `relayUrl` is
    `https://host[:port]`, no path, a trailing `/` dropped (`400`, `"relayUrl"`); `grant` is 16–200 characters (`400`,
    `"grant"`). A relay that refuses, or does not answer in 15 seconds, is `502 upstream_failed`,
-   its status and `error` in the message. Enrolling again with the same key keeps the `daemonId`.
+   its status and `error` in the message and the relay's answer in `details.relay` — its `status`,
+   `code`, `error` and whatever else it said (`{ "unreachable": true, "error" }` when there was no
+   answer), so the app can tell the user what to do. Enrolling again with the same key keeps the `daemonId`.
+   A backend that answers anything else, or drops the request, leaves the app to ask the relay
+   itself (`GET /v1/session/enrolment`, below), which keeps every refusal on the grant.
    The backend keeps `relayUrl` as given (less surrounding spaces and a trailing `/`) and reports it as `relay.url`; one pointed at a test relay
    instead (*Testing*) reports the address it actually uses.
 
@@ -1255,8 +1259,28 @@ account. `label` is optional (cut to 60 characters). It answers `200 { "daemonId
 same key enrolled again keeps its id (and moves to the grant's account). Refusals:
 `400 {"error":"grant, publicKey and proof"}` (missing, or a key that is not 32 bytes),
 `401 {"error":"proof not accepted"}`, `401 {"error":"grant not accepted"}` (unknown, expired or
-spent), `429 {"error":"too many requests"}` (too many enrolments from one address). Nothing else is
-needed: once enrolled, the backend reaches every phone that account has bound.
+spent), `409` (the account already has as many backends in use as it may have, with `limit` and
+`backends: [{ id, label, lastSeenAt }]` — the ones in the way), `429 {"error":"too many requests"}`
+(too many enrolments from one address). Nothing else is needed: once enrolled, the backend reaches
+every phone that account has bound.
+
+Every refusal from the relay, on any route, also carries `code`, a word to act on where `error` is a
+sentence to read. On enrolment: `bad-request`, `proof-rejected`, `grant-not-accepted`,
+`backend-limit`, `rate-limited`; on pushing: `bad-request`, `not-sealed`, `unauthorized`,
+`account-suspended`, `not-entitled`, `token-not-bound`, `token-gone`, `daily-quota`,
+`rate-limited`, `apns-refused`. A refused enrolment is written on its grant before it is answered.
+
+**Moving to a new backend.** An account has room for a set number of backends heard from recently;
+one long silent gives up its place by itself. To move sooner, the phone takes the old one off —
+the app lists the account's backends in Settings, each with *Remove* — and the grant refused for
+want of room works again while it lasts. The app's relay session (the phone's, not the backend's)
+can:
+
+| Route | |
+| --- | --- |
+| `GET /v1/session` | also lists `backends: [{ id, label, createdAt, lastSeenAt, active }]` and `backendLimit` (`null`: no limit); `active` ones hold a place |
+| `GET /v1/session/enrolment` | what became of the newest grant: `{ enrolment: { issuedAt, expiresAt, result, attemptedAt, refusal } }`, `result` `accepted`, `refused` (with `refusal: { code, error, status, … }`) or `unused` — no backend presented it, so the backend never reached the relay |
+| `DELETE /v1/session/backends/{id}` | takes that backend off the account (`404` for one not on it); it pushes again only after enrolling anew |
 
 **`POST /v1/push`** — signed (below).
 
@@ -1390,8 +1414,9 @@ curl -X POST http://127.0.0.1:18780/_next -d '{"on":"enrol","answer":"grant"}'  
 ```
 
 Push answers: `not-enrolled`, `suspended`, `not-entitled`, `unbound`, `quota`, `rate`, `gone`,
-`apns`, `unreachable`; enrolment answers: `grant`, `proof`, `rate`, `unreachable`; `ok` goes back
-to normal. The grant `expired-grant-for-testing` is always refused.
+`apns`, `unreachable`; enrolment answers: `grant`, `proof`, `backend-limit`, `rate`, `unreachable`; `ok` goes back
+to normal. Each carries the relay's `code`, so you can check what your backend passes on in
+`details.relay`. The grant `expired-grant-for-testing` is always refused.
 
 **`tools/mock-backend.mjs`** is the smallest backend the app works with: the core and nothing
 else, in one file with no dependencies, calls and messages simulated, with the simulation hooks.

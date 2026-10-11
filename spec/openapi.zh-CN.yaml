@@ -1019,7 +1019,7 @@ components:
             code:
               type: string
               enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, outbound_limited, device_unavailable, internal, upstream_failed]
-              description: "upstream_failed（502）只来自 POST /v1/push/enrol：中转拒绝或没有回答。"
+              description: "upstream_failed（502）只来自 POST /v1/push/enrol：中转拒绝或没有回答；details.relay 带中转的回答（status、code 如 backend-limit 或 grant-not-accepted、error 等），连不上时是 { unreachable: true, error }。"
             message: { type: string, description: "给人看的文字，使用读者的语言。" }
             details:
               type: object

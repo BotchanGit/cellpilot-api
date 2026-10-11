@@ -2194,7 +2194,7 @@
                   "internal",
                   "upstream_failed"
                 ],
-                "description": "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer."
+                "description": "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer; details.relay carries the relay's answer (status, code such as backend-limit or grant-not-accepted, error, …) or { unreachable: true, error }."
               },
               "message": {
                 "type": "string",

@@ -20,8 +20,10 @@
  *   curl -X POST http://127.0.0.1:18780/_next -d '{"answer":"quota","times":5}'
  *   curl -X POST http://127.0.0.1:18780/_next -d '{"on":"enrol","answer":"grant"}'
  * push answers: not-enrolled (401), suspended / not-entitled (402), unbound (403), quota / rate
- * (429), gone (410), apns (502), unreachable (500); enrol answers: grant / proof (401), rate (429),
- * unreachable (500); ok (back to normal).
+ * (429), gone (410), apns (502), unreachable (500); enrol answers: grant / proof (401),
+ * backend-limit (409), rate (429), unreachable (500); ok (back to normal). Every refusal carries
+ * the relay's `code` beside `error`, and a backend passes an enrolment refusal on to the app in
+ * `details.relay` of its 502.
  *
  * Pushes the relay would pass but that break the spec's rules for what the app shows (category,
  * collapse id, sound, interruption level, the sealed fields) are passed too, with "warnings" on
@@ -49,23 +51,24 @@ const saveDaemons = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stri
 const nonces = new Set();
 let next = { on: 'push', answer: 'ok', times: 0 };
 
-// The relay's answers, body and all (the quota is an example value).
+// The relay's answers, body and all (the quota and the backend limit are example values).
 const ANSWERS = {
-  'not-enrolled': [401, { error: 'not authorized' }],
-  suspended: [402, { error: 'account suspended' }],
-  'not-entitled': [402, { error: 'not entitled' }],
-  unbound: [403, { error: 'token not bound to this daemon' }],
-  quota: [429, { error: 'daily quota reached', quota: 1000 }],
-  rate: [429, { error: 'rate limited' }],
-  gone: [410, { error: 'token gone', gone: true, reason: 'BadDeviceToken' }],
-  apns: [502, { error: 'apns refused', status: 400, reason: 'BadTopic' }],
-  unreachable: [500, { error: 'relay error' }],
+  'not-enrolled': [401, { error: 'not authorized', code: 'unauthorized' }],
+  suspended: [402, { error: 'account suspended', code: 'account-suspended' }],
+  'not-entitled': [402, { error: 'not entitled', code: 'not-entitled' }],
+  unbound: [403, { error: 'token not bound to this daemon', code: 'token-not-bound' }],
+  quota: [429, { error: 'daily quota reached', code: 'daily-quota', quota: 1000 }],
+  rate: [429, { error: 'rate limited', code: 'rate-limited' }],
+  gone: [410, { error: 'token gone', code: 'token-gone', gone: true, reason: 'BadDeviceToken' }],
+  apns: [502, { error: 'apns refused', code: 'apns-refused', status: 400, reason: 'BadTopic' }],
+  unreachable: [500, { error: 'relay error', code: 'relay-error' }],
 };
 const ENROL_ANSWERS = {
-  grant: [401, { error: 'grant not accepted' }],
-  proof: [401, { error: 'proof not accepted' }],
-  rate: [429, { error: 'too many requests' }],
-  unreachable: [500, { error: 'relay error' }],
+  grant: [401, { error: 'the grant is unknown, already used, or past its ten minutes; ask the phone for a new one', code: 'grant-not-accepted' }],
+  proof: [401, { error: 'the proof is not this grant signed with that key', code: 'proof-rejected' }],
+  'backend-limit': [409, { error: 'this account already has the most backends it can have; remove one in the app to enrol this one', code: 'backend-limit', limit: 2, backends: [{ id: 'd_OldBackend01', label: 'old-mac (cellpilotd)', lastSeenAt: '2026-10-01T08:00:00.000Z' }] }],
+  rate: [429, { error: 'too many requests', code: 'rate-limited' }],
+  unreachable: [500, { error: 'relay error', code: 'relay-error' }],
 };
 
 // What the app expects of each alert category (spec/device-api.md, *Envelope*): collapse id prefix, sound,
@@ -166,11 +169,11 @@ http.createServer(async (req, res) => {
       log({ path, ok: false, forced: next.answer, status });
       return reply(res, status, answer);
     }
-    if (!grant || !proof || Buffer.from(publicKey || '', 'base64').length !== 32) { log({ path, ok: false, why: 'grant, publicKey and proof' }); return reply(res, 400, { error: 'grant, publicKey and proof' }); }
+    if (!grant || !proof || Buffer.from(publicKey || '', 'base64').length !== 32) { log({ path, ok: false, why: 'grant, publicKey and proof' }); return reply(res, 400, { error: 'grant, publicKey and proof are required', code: 'bad-request' }); }
     let proven = false;
     try { proven = crypto.verify(null, Buffer.from(`cellpilot-enrol\n${grant}`), pubKey(publicKey), Buffer.from(proof, 'base64')); } catch { /* malformed */ }
-    if (!proven) { log({ path, ok: false, why: 'proof not accepted' }); return reply(res, 401, { error: 'proof not accepted' }); }
-    if (grant === 'expired-grant-for-testing') { log({ path, ok: false, why: 'grant not accepted' }); return reply(res, 401, { error: 'grant not accepted' }); }
+    if (!proven) { log({ path, ok: false, why: 'proof not accepted' }); return reply(res, 401, ENROL_ANSWERS.proof[1]); }
+    if (grant === 'expired-grant-for-testing') { log({ path, ok: false, why: 'grant not accepted' }); return reply(res, 401, ENROL_ANSWERS.grant[1]); }
     // The same key enrolling again keeps its id.
     let id = [...daemons].find(([, k]) => k === publicKey)?.[0];
     id ??= `d_${crypto.randomBytes(9).toString('base64url')}`;
@@ -196,7 +199,7 @@ http.createServer(async (req, res) => {
     nonces.add(`${id}:${nonce}`);
     return null;
   })();
-  if (why) { log({ path, ok: false, why }); return reply(res, 401, { error: 'not authorized', why }); }
+  if (why) { log({ path, ok: false, why }); return reply(res, 401, { error: 'not authorized', code: 'unauthorized', why }); }
 
   if (req.method === 'POST' && path === '/v1/push') {
     const { token, type, collapseId } = body;
@@ -207,7 +210,7 @@ http.createServer(async (req, res) => {
       return reply(res, status, answer);
     }
     const bad = unsealed(type, body.body);
-    if (bad) { log({ path, ok: false, type, why: bad, body: body.body }); return reply(res, 400, { error: 'only sealed pushes are relayed' }); }
+    if (bad) { log({ path, ok: false, type, why: bad, body: body.body }); return reply(res, 400, { error: 'only sealed pushes are relayed', code: 'not-sealed' }); }
     const inner = body.body.e ? open(body.body.e) : null;
     const warn = warnings(type, body.body, collapseId, inner);
     log({ path, ok: true, type, token: String(token).slice(0, 12), collapseId, clear: body.body.aps ?? null, v: body.body.v, opened: body.body.e ? inner ?? 'does not open with any client token (add one: POST /_tokens)' : '(badge only)', ...(warn.length ? { warnings: warn } : {}) });

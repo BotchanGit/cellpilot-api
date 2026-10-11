@@ -94,7 +94,7 @@ CellPilot 仅为合法用途而制作。我们遵守法律法规，不认可、�
   | 429 | `rate_limited` | 这个来源失败次数过多。带 `Retry-After`（秒）。 |
   | 429 | `outbound_limited` | `dial` 或发送短信被外发限制拒绝（见“外发限制”）；`details` 写明是哪条规则、到什么时候。 |
   | 500 | `internal` | 其它任何情况，包括模块拒绝了命令（见“通话”）。 |
-  | 502 | `upstream_failed` | 只用于 `POST /v1/push/enrol`：中转拒绝了登记或连不上。 |
+  | 502 | `upstream_failed` | 只用于 `POST /v1/push/enrol`：中转拒绝了登记或连不上；`details.relay` 说明是哪一种（见“推送”）。 |
   | 503 | `device_unavailable` | 设备没接上或没准备好。 |
 
 - 语言：客户端在每个请求和事件流上发 `X-Lang: en` 或 `X-Lang: zh`。以 `zh` 开头的（`zh-Hans`）是中文，其他都是英文。后端产生的一切给人看的文字（错误信息、事件文本、安全检查文本、告警标题、归属地、通话的 `endReason`、短信的 `error`）用读者的语言：请求用 `X-Lang`，没有就用客户端记录里的 `lang`，再没有用英文；事件流用这条连接所属客户端记录里的 `lang`，所以同一个事件可以用两种语言发出。几个客户端共读的记录保存原因而不是一句话，按每个读者生成文字。用户输入的内容、号码、名字永远不翻译。
@@ -647,7 +647,7 @@ key = HKDF-SHA256(ikm = SHA-256(token), salt = "cellpilot", info = "push-v1", le
 
 1. 用户在 App 里用 Apple 登录，App 把手机自己的 APNs token 绑到中转上的这个账号，所以后端只能到达它登记所属账号的手机。
 2. App 问后端怎么推送：`GET /v1/push` 返回 `{ "mode": "none" | "relay" | "direct", "relay": { "url", "daemonId" } | null, "problem"? }`。`none`：还没有推送途径；`relay`：已登记。（`direct` 是保留值；后端报告 `none` 或 `relay`。）`problem`（可选）说明推送为什么发不出去，好让手机告诉主人：`{ "code", "at", "quota"? }`，`code` 是 `suspended`、`not-entitled`、`quota`（带每日额度 `quota`）、`rate`、`not-enrolled`、`unbound`、`apns` 或 `unreachable`，`at` 是开始的时间——之后同一原因的拒绝不改它。`quota` 是中转的每日额度，只随 `quota` 出现。推送恢复后为 `null` 或不出现；没有定时重试，每条推送都照常尝试，所以暂停、开通或当日额度一恢复，第一条成功的推送就把它清掉。有 `snapshot` 的后端在它变化时推进 `rev`；snapshot 里的 `push` 是同一个对象。App 在设置页显示它，`unbound` 时自己去中转重新绑定 token。
-3. 如果是 `none`，App 从中转拿一张一次性许可（十分钟有效）交给后端：`POST /v1/push/enrol { "relayUrl", "grant" }`。后端到中转登记（`POST /v1/daemons`，见下），返回新的推送状态。此后它经中转推送，中转只允许它到达这个账号的手机。`relayUrl` 是 `https://主机[:端口]`，不带路径，结尾的 `/` 去掉（`400`，`"relayUrl"`）；`grant` 16–200 个字符（`400`，`"grant"`）。中转拒绝、或 15 秒没回答，回 `502 upstream_failed`，message 里写中转的状态码和 `error`。用同一把密钥再登记沿用原来的 `daemonId`。后端按给出的样子保存 `relayUrl`（去掉首尾空白和结尾的 `/`），并作为 `relay.url` 报告；指向测试中转（见“测试”）的后端报告它实际使用的地址。
+3. 如果是 `none`，App 从中转拿一张一次性许可（十分钟有效）交给后端：`POST /v1/push/enrol { "relayUrl", "grant" }`。后端到中转登记（`POST /v1/daemons`，见下），返回新的推送状态。此后它经中转推送，中转只允许它到达这个账号的手机。`relayUrl` 是 `https://主机[:端口]`，不带路径，结尾的 `/` 去掉（`400`，`"relayUrl"`）；`grant` 16–200 个字符（`400`，`"grant"`）。中转拒绝、或 15 秒没回答，回 `502 upstream_failed`，message 里写中转的状态码和 `error`，`details.relay` 原样带上中转的回答——它的 `status`、`code`、`error` 和其余字段（没有回答时是 `{ "unreachable": true, "error" }`），App 据此告诉用户该怎么做。后端若回了别的、或直接断开请求，App 会自己去问中转（`GET /v1/session/enrolment`，见下），中转把每次拒绝都记在许可上。用同一把密钥再登记沿用原来的 `daemonId`。后端按给出的样子保存 `relayUrl`（去掉首尾空白和结尾的 `/`），并作为 `relay.url` 报告；指向测试中转（见“测试”）的后端报告它实际使用的地址。
 
 ### 中转
 
@@ -659,7 +659,17 @@ key = HKDF-SHA256(ikm = SHA-256(token), salt = "cellpilot", info = "push-v1", le
 { "grant": "…", "publicKey": "<32 个原始字节，base64>", "proof": "<签名，base64>", "label": "my-backend" }
 ```
 
-`proof` 是用私钥对 `cellpilot-enrol\n` 加许可的 Ed25519 签名——公钥不是秘密，没有它任何人都能把别人的后端登记到自己账号下。`label` 可选（截到 60 个字符）。返回 `200 { "daemonId": "d_…" }`；同一把公钥再登记沿用原来的 id（并移到这张许可所属的账号）。拒绝：`400 {"error":"grant, publicKey and proof"}`（缺字段或公钥不是 32 字节）、`401 {"error":"proof not accepted"}`、`401 {"error":"grant not accepted"}`（许可不存在、过期或已用过）、`429 {"error":"too many requests"}`（同一地址登记太多次）。不需要别的步骤：登记后就能推给这个账号绑定的每台手机。
+`proof` 是用私钥对 `cellpilot-enrol\n` 加许可的 Ed25519 签名——公钥不是秘密，没有它任何人都能把别人的后端登记到自己账号下。`label` 可选（截到 60 个字符）。返回 `200 { "daemonId": "d_…" }`；同一把公钥再登记沿用原来的 id（并移到这张许可所属的账号）。拒绝：`400 {"error":"grant, publicKey and proof"}`（缺字段或公钥不是 32 字节）、`401 {"error":"proof not accepted"}`、`401 {"error":"grant not accepted"}`（许可不存在、过期或已用过）、`409`（账号里在用的后端已经到上限，带 `limit` 和挡住它的后端 `backends: [{ id, label, lastSeenAt }]`）、`429 {"error":"too many requests"}`（同一地址登记太多次）。不需要别的步骤：登记后就能推给这个账号绑定的每台手机。
+
+中转的每个拒绝（任何接口）都另带 `code`：`error` 是给人读的一句话，`code` 是给程序判断的一个词。登记：`bad-request`、`proof-rejected`、`grant-not-accepted`、`backend-limit`、`rate-limited`；推送：`bad-request`、`not-sealed`、`unauthorized`、`account-suspended`、`not-entitled`、`token-not-bound`、`token-gone`、`daily-quota`、`rate-limited`、`apns-refused`。登记被拒时，原因先记在那张许可上再回答。
+
+**换一个后端。** 一个账号只能有一定数量最近活跃的后端；长期不活跃的会自己让出名额。想马上换，就由手机把旧的移除——App 在设置里列出账号下的后端，每个都有“移除”——之前因为没名额被拒的许可在有效期内可以再用。App 的中转会话（手机的，不是后端的）可以：
+
+| 接口 | |
+| --- | --- |
+| `GET /v1/session` | 另外列出 `backends: [{ id, label, createdAt, lastSeenAt, active }]` 和 `backendLimit`（`null` 为不限）；`active` 的占着名额 |
+| `GET /v1/session/enrolment` | 最新一张许可的结果：`{ enrolment: { issuedAt, expiresAt, result, attemptedAt, refusal } }`，`result` 是 `accepted`、`refused`（带 `refusal: { code, error, status, … }`）或 `unused`——没有后端拿它来登记过，也就是后端根本没连到中转 |
+| `DELETE /v1/session/backends/{id}` | 把这个后端从账号移除（不在这个账号下则 `404`）；它要重新登记才能再推送 |
 
 **`POST /v1/push`**——要签名（见下）。
 
@@ -748,7 +758,7 @@ curl -X POST http://127.0.0.1:18780/_next -d '{"answer":"quota","times":3}'     
 curl -X POST http://127.0.0.1:18780/_next -d '{"on":"enrol","answer":"grant"}'      # 下一次登记
 ```
 
-推送的回答：`not-enrolled`、`suspended`、`not-entitled`、`unbound`、`quota`、`rate`、`gone`、`apns`、`unreachable`；登记的回答：`grant`、`proof`、`rate`、`unreachable`；`ok` 恢复正常。许可 `expired-grant-for-testing` 总是被拒。
+推送的回答：`not-enrolled`、`suspended`、`not-entitled`、`unbound`、`quota`、`rate`、`gone`、`apns`、`unreachable`；登记的回答：`grant`、`proof`、`backend-limit`、`rate`、`unreachable`；`ok` 恢复正常。每个回答都带中转的 `code`，可以用来检查你的后端在 `details.relay` 里转达了什么。许可 `expired-grant-for-testing` 总是被拒。
 
 **`tools/mock-backend.mjs`** 是 App 能用的最小后端：只有核心，一个文件、没有依赖，通话和短信都是模拟的，带模拟钩子。可以当作起点来读，也可以让 App 和它配对，看看只有核心的后端在手机上是什么样子：
 

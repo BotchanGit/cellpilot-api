@@ -1022,7 +1022,7 @@ components:
             code:
               type: string
               enum: [invalid_request, unauthorized, forbidden, not_found, feature_unavailable, conflict, signed_out, rate_limited, outbound_limited, device_unavailable, internal, upstream_failed]
-              description: "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer."
+              description: "upstream_failed (502) only from POST /v1/push/enrol: the relay refused or did not answer; details.relay carries the relay's answer (status, code such as backend-limit or grant-not-accepted, error, …) or { unreachable: true, error }."
             message: { type: string, description: "For people, in the reader's language." }
             details:
               type: object

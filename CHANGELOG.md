@@ -7,6 +7,23 @@ change. Tools are versioned with the repository.
 
 [中文说明见下方](#中文)
 
+## 2026-10-11
+
+### Added — clear enrolment errors; moving to a new backend
+
+- `502 upstream_failed` from `POST /v1/push/enrol` now carries the relay's answer in
+  `details.relay` (`status`, `code`, `error`, …, or `unreachable: true`). *What to change:* a
+  backend should pass it on as described, and answer a refusal with the 502 rather than dropping
+  the request.
+- Every refusal from the relay carries a `code` (`backend-limit`, `grant-not-accepted`,
+  `proof-rejected`, …) beside `error`. An enrolment refused because the account has no room
+  (`409 backend-limit`) lists the backends in the way, and does not spend the grant.
+- The relay keeps the reason for a refused enrolment on its grant, and the app reads it with its
+  own session (`GET /v1/session/enrolment`), so the user sees why even when the backend does not
+  pass it on.
+- The app lists the account's backends in Settings and can remove one, freeing its place for a new
+  backend (`DELETE /v1/session/backends/{id}`).
+
 ## 2026-10-10
 
 ### Changed rule — outbound limits
@@ -178,6 +195,15 @@ First public release of the CellPilot Device API v1.
 ---
 
 ## 中文
+
+### 2026-10-11
+
+**新增：登记出错时说清楚原因；换后端**
+
+- `POST /v1/push/enrol` 返回的 `502 upstream_failed` 现在在 `details.relay` 里带上中转的回答（`status`、`code`、`error` 等，连不上时是 `unreachable: true`）。*需要改的：* 后端按说明把它转给 App；中转拒绝时回 502，不要直接断开请求。
+- 中转的每个拒绝都在 `error` 之外带 `code`（`backend-limit`、`grant-not-accepted`、`proof-rejected` 等）。因账号没有名额被拒的登记（`409 backend-limit`）会列出占着名额的后端，许可不消耗。
+- 中转把登记被拒的原因记在许可上，App 用自己的会话可以查到（`GET /v1/session/enrolment`），所以即使后端没有转达，用户也能看到原因。
+- App 在设置里列出账号下的后端，可以移除其中一个，把名额腾给新后端（`DELETE /v1/session/backends/{id}`）。
 
 ### 2026-10-10
 
