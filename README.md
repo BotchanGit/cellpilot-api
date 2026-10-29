@@ -191,7 +191,7 @@ no fraud, bulk or automated calls or messages, caller-ID changes, SIM pools or c
 services.
 
 **Made for receiving.** Calls and texts are limited to what one person needs now and then: a number
-is familiar three days after it is a contact or has contacted you; each day, calls to 3 and texts to
+can become familiar after it has been known for three days; the app promotes at most five per local day, prioritizing eligible numbers you contact and assigning unused past-day places to the longest-known numbers; each day, calls to 3 and texts to
 3 numbers not yet familiar, no links to them, 10 calls and 20 texts in all, and no more than 3
 different numbers in a few minutes. Verification codes the line receives cannot be sent on, and
 call forwarding cannot be set up. The app enforces this, and a backend should too (see *Outbound

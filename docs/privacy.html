@@ -28,7 +28,7 @@
 
 <section id="en" lang="en">
 <h1>CellPilot Privacy Policy</h1>
-<p class="meta">Effective 10 October 2026</p>
+<p class="meta">Effective 29 October 2026</p>
 <p class="lang"><b>English</b> · <a href="#zh">简体中文</a></p>
 
 <p>CellPilot is an iPhone app that works with a backend you run yourself, next to your own
@@ -48,6 +48,10 @@ decrypt (see below).</p>
   <li>The pairing token and the addresses of your backend are kept in the iOS Keychain. The app
     keeps a copy of your conversations, calls and voicemails on the device so it opens quickly.
     Unpairing removes them.</li>
+  <li><b>Device-local credentials</b>: the relay sign-in session and the version of Before You Start
+    you accepted are stored in device-only Keychain items. They do not migrate to another iPhone
+    through backup restoration. A replacement phone requires its own sign-in and acknowledgement;
+    the same Apple account can still be used independently on your own phones.</li>
   <li><b>Outbound limits</b>: to enforce the limits on calls and texts, the app keeps on this iPhone a
     record of the numbers you called or texted and when (for a day), a fingerprint of each text (not
     the text itself), when your last few calls ended, when it first saw each contact, caller and
@@ -144,7 +148,7 @@ date. Questions: <a href="mailto:privacy@cellpilot.dev">privacy@cellpilot.dev</a
 
 <section id="zh" lang="zh-Hans">
 <h1>CellPilot 隐私政策</h1>
-<p class="meta">生效日期：2026 年 10 月 10 日</p>
+<p class="meta">生效日期：2026 年 10 月 29 日</p>
 <p class="lang"><a href="#en">English</a> · <b>简体中文</b></p>
 
 <p>CellPilot 是一个 iPhone App，配合你自己运行的后端使用，后端接着你自己的蜂窝模块和 SIM 卡。本政策说明
@@ -158,6 +162,7 @@ App 和 CellPilot 推送中转处理哪些数据，以及我们作为 CellPilot 
 <h2>在你的 iPhone 上</h2>
 <ul>
   <li>配对令牌和后端地址保存在 iOS 钥匙串里。App 在本机保存会话、通话和留言的副本，以便快速打开。取消配对会删除它们。</li>
+  <li><b>本机凭证</b>：中转登录会话和使用前阅读的已确认版本存放在仅限本机的钥匙串项目中，不会通过备份恢复到另一台 iPhone。换机后需要独立登录和确认；同一 Apple 账号仍可在自己的多台手机上分别使用。</li>
   <li><b>外发限制</b>：为执行拨号和短信的限制，App 会在这台 iPhone 上保存：一天内你拨打或发短信的号码和时间、每条短信的指纹（不是短信内容本身）、最近几通电话的结束时间、第一次看到每个联系人和来电来信号码的时间（用来判断号码何时变成熟悉的号码）、模块里 SIM 卡的标识，以及一天内给你发验证码的发送方。这些记录只留在这台 iPhone 上，不会发送到任何地方，大部分在重新安装 App 后也会保留。你的后端可能保存类似的记录。</li>
   <li><b>麦克风</b>：只在通话时使用，把你的声音传给你的后端。</li>
   <li><b>通讯录</b>：只在你选择导入或导出联系人时读写。</li>

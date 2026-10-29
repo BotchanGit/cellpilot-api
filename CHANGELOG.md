@@ -7,6 +7,17 @@ change. Tools are versioned with the repository.
 
 [中文说明见下方](#中文)
 
+## 2026-10-29
+
+### Clarified — app familiarity and device-local state
+
+- Document the app's five-per-local-day familiarity queue: contacted eligible numbers take
+  available places first; unused completed-day places go to the longest-known eligible numbers.
+  Backend request/response shapes, core requirements and schema versions are unchanged.
+- Document device-only relay session credentials and Before You Start acceptance. A replacement
+  phone must sign in and acknowledge the notice independently; the Apple account itself is not
+  restricted to one phone. No new server-side data collection is introduced.
+
 ## 2026-10-11
 
 ### Added — clear enrolment errors; moving to a new backend
@@ -197,6 +208,12 @@ First public release of the CellPilot Device API v1.
 ---
 
 ## 中文
+
+
+### 2026-10-29 — App 行为说明
+
+- 补充按本地自然日每天五个熟悉名额的分配：主动联系的合格号码优先，过去日期未使用的名额给认识最久的合格号码。后端请求／响应、核心要求和 schema 版本不变。
+- 补充中转登录凭证和使用前阅读确认只属于本机；换机后需要独立登录和确认。同一 Apple 账号仍可在自己的多台手机上分别登录，没有新增服务端数据采集。
 
 ### 2026-10-11
 
